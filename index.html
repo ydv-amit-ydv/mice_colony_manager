@@ -25,6 +25,8 @@
     --pending-soft: #f8f0fc;
     --lock: #b08900;
     --lock-soft: #fff9db;
+    --err: #e03131;
+    --err-soft: #fff0f0;
   }
   * { box-sizing: border-box; }
   body {
@@ -82,7 +84,6 @@
   }
   input[type=file] { display: none; }
 
-  /* Small paste-JSON box in the toolbar */
   .paste-json {
     width: 150px;
     padding: 6px 9px;
@@ -174,7 +175,6 @@
   .field input[type=date] { min-width: 130px; }
   .cage-actions { margin-left: auto; display:flex; gap:6px; align-items:center; }
 
-  /* Lineage pairing block */
   .lineage-wrap { display:flex; gap:18px; flex-wrap:wrap; padding:10px 16px; border-bottom:1px solid var(--line); background:#fcfdff; }
   .lineage { border:1px solid var(--line); border-radius:10px; padding:8px 12px; min-width:300px; }
   .lineage h5 { margin:0 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
@@ -185,9 +185,16 @@
   .lineage .resolve { font-size:11px; margin-top:6px; }
   .lineage .resolve.found { color: var(--ok); }
   .lineage .resolve.notfound { color: var(--warn); }
+  .lineage .resolve.sexwarn { color: var(--err); background: var(--err-soft); border:1px solid #ffc9c9; border-radius:6px; padding:4px 8px; font-weight:600; }
+  .lineage .resolve.dead { color: var(--warn); background: var(--warn-soft); border:1px solid #ffd8a8; border-radius:6px; padding:4px 8px; font-weight:600; }
   .lineage-mode { display:flex; flex-direction:column; gap:1px; }
   .lineage-mode label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
   .lineage-mode select { min-width:130px; }
+  .parent-disp { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:8px; padding-top:8px; border-top:1px dashed var(--line); }
+  .parent-disp .field input { border:1px solid var(--line); background:#fff; }
+  .parent-disp .alive-box { display:flex; flex-direction:column; gap:2px; align-items:center; }
+  .parent-disp .alive-box label { font-size:10px; color:var(--muted); text-transform:uppercase; }
+  .linked-note { font-size:11px; color: var(--accent); margin-top:6px; }
 
   .status-badge { font-size:11px; padding:3px 9px; border-radius:20px; font-weight:600; }
   .status-active { background: var(--ok-soft); color: var(--ok); }
@@ -216,11 +223,11 @@
   .row-del { color: var(--muted); cursor:pointer; border:none; background:none; font-size:16px; padding:0 4px;}
   .row-del:hover { color: var(--female); }
   .wean-tag { font-size:10px; background:var(--warn-soft); color:var(--warn); padding:1px 6px; border-radius:10px; margin-left:5px; font-weight:700; }
+  .parent-tag { font-size:10px; background:var(--accent-soft); color:var(--accent); padding:1px 6px; border-radius:10px; margin-left:5px; font-weight:700; }
   .empty { padding: 50px; text-align:center; color: var(--muted); }
   .pill { font-size:11px; padding:2px 8px; border-radius:20px; background:var(--accent-soft); color:var(--accent); }
   .note-cell input { color: var(--muted); font-size:13px; min-width: 220px; }
 
-  /* breeding log */
   .breeding { padding: 10px 16px; border-top: 1px dashed var(--line); background:#fbfcfd; }
   .breeding h4 { margin:0 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
   .event-row { display:flex; gap:8px; align-items:center; margin-bottom:6px; flex-wrap:wrap; }
@@ -239,12 +246,10 @@
 </head>
 <body>
 <header>
-  <h1>🐭 Mouse Colony Manager <span class="version-badge">v2.6</span></h1>
+  <h1>🐭 Mouse Colony Manager <span class="version-badge">v2.7</span></h1>
   <div class="toolbar">
     <button class="primary" onclick="addCage()">＋ Mating</button>
     <label class="filebtn">⬆ Import JSON<input type="file" accept=".json" onchange="importJSON(this)"></label>
-    <!-- <input class="paste-json" id="pasteJson" type="text" placeholder="paste JSON…" onkeydown="if(event.key==='Enter')importPasted()">
-    <button class="tiny" onclick="importPasted()">Load paste</button> -->
     <button onclick="exportCSV()">⬇ Export CSV</button>
     <button onclick="exportJSON()">⬇ Export JSON</button>
     <button onclick="copyJSON(this)">📋 Copy JSON</button>
@@ -281,11 +286,11 @@
   <div id="content"></div>
 </main>
 
-<footer>v2.2 — Auto-saved to this browser. Export to JSON for a complete backup (all details), or CSV for a quick-view snapshot. — Built for offline, cross-platform use.</footer>
+<footer>v2.7 — Auto-saved to this browser. Export to JSON for a complete backup (all details), or CSV for a quick-view snapshot. — Built for offline, cross-platform use.</footer>
 
 <script>
 /* ---------- Constants ---------- */
-const APP_VERSION = '2.2';
+const APP_VERSION = '2.7';
 const WEAN_AGE_DAYS = 21;
 const SEXES = ['Female','Male','Unknown'];
 const SAMPLE_STATUS = ['','Sample collected','Pending','Confirmed','Not confirmed'];
@@ -294,15 +299,14 @@ const STORAGE_KEY = 'mouseColony.v4';
 const COLONY_NAME_KEY = 'mouseColony.colonyName';
 const LOCK_KEY = 'mouseColony.masterCode';
 
-/* Lineage modes for a parent that is NOT an existing mouse */
 const LINEAGE_MODES = ['Founder','Progeny of'];
 
 /* ---------- Data model ---------- */
-let colony = [];   // array of matings (cages)
+let colony = [];
 let colonyName = '';
 let filterWean = false;
 let filterActive = false;
-let editUnlocked = false;   // master lock state for the session
+let editUnlocked = false;
 
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 
@@ -314,19 +318,18 @@ function blankMouse() {
 function blankCage() {
   return { cage:'New_Mating',
            femaleId:'', femaleLineage:'', femaleDob:'', femaleLineageMode:'Founder', femaleLineageParent:'',
+           femaleDisposition:'', femaleDispositionDate:'', femaleAlive:true,
            maleId:'',   maleLineage:'',   maleDob:'',   maleLineageMode:'Founder',   maleLineageParent:'',
+           maleDisposition:'', maleDispositionDate:'', maleAlive:true,
            datePaired:'', active:true,
            events:[], mice:[blankMouse()],
            _new:true };
 }
 function blankEvent(){ return { type:'Paired', date:todayISO(), detail:'', locked:false, _new:true }; }
 
-/* ---------- Lock helpers ----------
-   _new === true  → freshly added in this session, always editable.
-   _new !== true  → imported/old data, editable only when editUnlocked === true.
-*/
+/* ---------- Lock helpers ---------- */
 function locked(obj){ return obj && obj._new !== true && !editUnlocked; }
-function ro(obj){ return locked(obj) ? 'disabled' : ''; }   // returns disabled attr for inputs
+function ro(obj){ return locked(obj) ? 'disabled' : ''; }
 
 function hasMasterCode(){ return !!localStorage.getItem(LOCK_KEY); }
 function setMasterCode(){
@@ -359,7 +362,6 @@ function clearMasterCode(){
   localStorage.removeItem(LOCK_KEY); editUnlocked = true; render();
 }
 
-/* mark every existing record as "old" (locked candidate) */
 function markAllOld(){
   colony.forEach(c=>{
     c._new = false;
@@ -389,9 +391,13 @@ function normCage(c){
     femaleId:c.femaleId||'',
     femaleLineage:c.femaleLineage||'', femaleDob:c.femaleDob||'',
     femaleLineageMode:c.femaleLineageMode||'Founder', femaleLineageParent:c.femaleLineageParent||'',
+    femaleDisposition:c.femaleDisposition||'', femaleDispositionDate:c.femaleDispositionDate||'',
+    femaleAlive: c.femaleAlive!==false,
     maleId:c.maleId||'',
     maleLineage:c.maleLineage||'', maleDob:c.maleDob||'',
     maleLineageMode:c.maleLineageMode||'Founder', maleLineageParent:c.maleLineageParent||'',
+    maleDisposition:c.maleDisposition||'', maleDispositionDate:c.maleDispositionDate||'',
+    maleAlive: c.maleAlive!==false,
     datePaired:c.datePaired||'',
     active: c.active!==false,
     events:(c.events||[]).map(e=>({type:e.type||'Note',date:e.date||'',detail:e.detail||'',locked:!!e.locked, _new:!!e._new})),
@@ -400,22 +406,24 @@ function normCage(c){
   };
 }
 
-/* ---------- Known-mouse index (for auto-detect of parents) ----------
-   A parent "exists" if any mouse in the colony has a matching mouseId AND is alive.
+/* ---------- Known-mouse index ----------
+   A parent can be matched to ANY mouse (alive or not) so we can warn about
+   sex mismatches and disposition. Prefer live mice, but still return dead ones.
 */
 function findKnownMouse(id){
   id = String(id||'').trim();
   if(!id) return null;
+  let dead = null;
   for(const c of colony){
     for(const m of c.mice){
-      if(String(m.mouseId).trim() === id && m.alive){
-        return { mouse:m, cage:c };
+      if(String(m.mouseId).trim() === id){
+        if(m.alive) return { mouse:m, cage:c, alive:true };
+        if(!dead) dead = { mouse:m, cage:c, alive:false };
       }
     }
   }
-  return null;
+  return dead;
 }
-/* Derive a lineage label for a mouse from its birth-mating, if any. */
 function lineageOfMouse(targetMouse){
   for(const c of colony){
     if(c.mice.includes(targetMouse)){
@@ -425,10 +433,7 @@ function lineageOfMouse(targetMouse){
   return '';
 }
 
-/* ---------- ID uniqueness ----------
-   Mouse IDs are alphanumeric and must be unique across the whole colony.
-   Ear punches are numeric-only.
-*/
+/* ---------- ID uniqueness ---------- */
 function allMouseIds(exceptMouse){
   const set = new Set();
   colony.forEach(c=>c.mice.forEach(m=>{
@@ -489,6 +494,19 @@ function renderLockBar(){
     el.innerHTML = `🔒 <b>Locked</b> <span>— old/imported data is read-only. Newly added items stay editable.</span>
       <button class="tiny primary" onclick="unlock()">Unlock to edit</button>`;
   }
+}
+
+/* ---------- Is a given mouse used as a parent anywhere? ---------- */
+function parentRefsOfMouse(mouse){
+  // returns array of {cage, which} where this mouse's id is used as parent
+  const refs = [];
+  const id = String(mouse.mouseId||'').trim().toLowerCase();
+  if(!id) return refs;
+  colony.forEach(c=>{
+    if(String(c.femaleId||'').trim().toLowerCase()===id) refs.push({cage:c, which:'female'});
+    if(String(c.maleId||'').trim().toLowerCase()===id)   refs.push({cage:c, which:'male'});
+  });
+  return refs;
 }
 
 /* ---------- Rendering ---------- */
@@ -576,10 +594,11 @@ function render() {
       const mDis = ro(m);
       const canKill = m.disposition.trim() && m.dispositionDate;
       const aliveDisabled = mDis || (m.alive && !canKill);
+      const usedAsParent = parentRefsOfMouse(m).length > 0;
       const tr = document.createElement('tr');
       tr.dataset.ci = ci; tr.dataset.mi = mi;
       tr.innerHTML = `
-        <td class="id-col"><input value="${esc(m.mouseId)}" ${mDis} placeholder="alphanumeric" onchange="updMouseId(${ci},${mi},this)"></td>
+        <td class="id-col"><input value="${esc(m.mouseId)}" ${mDis} placeholder="alphanumeric" onchange="updMouseId(${ci},${mi},this)">${usedAsParent?'<span class="parent-tag">PARENT</span>':''}</td>
         <td><input type="date" value="${esc(m.dob)}" ${mDis} onchange="updDob(${ci},${mi},this.value)"></td>
         <td class="age-cell ${weanReady?'wean-ready':''}">${ageLabel(m.dob)}${weanReady?'<span class="wean-tag">WEAN</span>':''}</td>
         <td><input value="${esc(m.earPunch)}" ${mDis} inputmode="numeric" placeholder="numeric" onchange="updEarPunch(${ci},${mi},this)"></td>
@@ -588,8 +607,8 @@ function render() {
         <td><input type="date" value="${esc(m.weaningDate)}" ${mDis} onchange="updWeaning(${ci},${mi},this.value)"></td>
         <td><select class="samp-${esc(m.sampleStatus)}" ${mDis} onchange="updM(${ci},${mi},'sampleStatus',this.value);render()">
             ${SAMPLE_STATUS.map(s=>`<option value="${s}" ${m.sampleStatus===s?'selected':''}>${s||'—'}</option>`).join('')}</select></td>
-        <td><input value="${esc(m.disposition)}" ${mDis} placeholder="e.g. culled / transferred" onchange="updM(${ci},${mi},'disposition',this.value);render()"></td>
-        <td><input type="date" value="${esc(m.dispositionDate)}" ${mDis} onchange="updM(${ci},${mi},'dispositionDate',this.value);render()"></td>
+        <td><input value="${esc(m.disposition)}" ${mDis} placeholder="e.g. culled / transferred" onchange="updMDisp(${ci},${mi},'disposition',this.value)"></td>
+        <td><input type="date" value="${esc(m.dispositionDate)}" ${mDis} onchange="updMDisp(${ci},${mi},'dispositionDate',this.value)"></td>
         <td style="text-align:center" title="${m.alive && !canKill ? 'Fill Disposition + Disposition Date before marking not alive':''}">
             <input type="checkbox" ${m.alive?'checked':''} ${aliveDisabled?'disabled':''} onchange="setAlive(${ci},${mi},this.checked)"></td>
         <td class="note-cell"><input value="${esc(m.notes)}" ${mDis} onchange="updM(${ci},${mi},'notes',this.value)"></td>
@@ -637,6 +656,10 @@ function parentBlock(which, cage, ci, disabled){
   const dobKey  = isF ? 'femaleDob'  : 'maleDob';
   const modeKey = isF ? 'femaleLineageMode'   : 'maleLineageMode';
   const parKey  = isF ? 'femaleLineageParent' : 'maleLineageParent';
+  const dispKey = isF ? 'femaleDisposition' : 'maleDisposition';
+  const dispDateKey = isF ? 'femaleDispositionDate' : 'maleDispositionDate';
+  const aliveKey = isF ? 'femaleAlive' : 'maleAlive';
+  const expectedSex = isF ? 'Female' : 'Male';
 
   const idVal = cage[idKey];
   const known = findKnownMouse(idVal);
@@ -645,15 +668,25 @@ function parentBlock(which, cage, ci, disabled){
   const div = document.createElement('div');
   div.className = 'lineage '+which;
 
+  // ----- Resolution / warnings -----
   let resolveHtml = '';
   if(idVal){
     if(known){
-      resolveHtml = `<div class="resolve found">✓ Found live mouse — lineage &amp; DOB auto-filled.</div>`;
+      const sexMismatch = known.mouse.sex !== expectedSex && known.mouse.sex !== 'Unknown';
+      if(sexMismatch){
+        resolveHtml += `<div class="resolve sexwarn">⚠ Sex mismatch — mouse "${esc(idVal)}" is recorded as <b>${esc(known.mouse.sex)}</b>, but is placed in the <b>${expectedSex}</b> slot. Check the ID or the recorded sex.</div>`;
+      } else {
+        resolveHtml += `<div class="resolve found">✓ Found ${known.alive?'live':''} mouse — lineage &amp; DOB auto-filled${known.mouse.sex==='Unknown'?' (sex is Unknown)':''}.</div>`;
+      }
+      if(!known.alive){
+        resolveHtml += `<div class="resolve dead">⚠ This mouse is marked <b>not alive</b> in its progeny record${known.mouse.disposition?(' ('+esc(known.mouse.disposition)+')'):''}. Disposition is synced from there.</div>`;
+      }
     } else {
-      resolveHtml = `<div class="resolve notfound">Not found among live mice — enter lineage &amp; DOB manually.</div>`;
+      resolveHtml = `<div class="resolve notfound">Not found among recorded mice — enter lineage &amp; DOB manually.</div>`;
     }
   }
 
+  // ----- Lineage controls -----
   let lineageControls = '';
   if(auto){
     const linDisplay = lineageOfMouse(known.mouse) || cage[linKey] || '—';
@@ -689,6 +722,45 @@ function parentBlock(which, cage, ci, disabled){
           onchange="upd(${ci},'${dobKey}',this.value)"></div>`;
   }
 
+  // ----- Disposition for the parent -----
+  // If linked to a recorded mouse, mirror that mouse's disposition (read-only here;
+  // edit it on the progeny row). If standalone, edit it directly on the cage.
+  let dispHtml = '';
+  if(auto){
+    const m = known.mouse;
+    const canKill = m.disposition.trim() && m.dispositionDate;
+    const aliveDisabled = ro(m) || (m.alive && !canKill);
+    dispHtml = `
+      <div class="parent-disp">
+        <div class="field"><label>Disposition</label>
+          <input value="${esc(m.disposition)}" placeholder="e.g. culled / retired"
+            onchange="updParentLinkedDisp('${idVal.replace(/'/g,"\\'")}','disposition',this.value)"></div>
+        <div class="field"><label>Disposition date</label>
+          <input type="date" value="${esc(m.dispositionDate)}"
+            onchange="updParentLinkedDisp('${idVal.replace(/'/g,"\\'")}','dispositionDate',this.value)"></div>
+        <div class="alive-box"><label>Alive</label>
+          <input type="checkbox" ${m.alive?'checked':''} ${aliveDisabled?'disabled':''}
+            onchange="setParentLinkedAlive('${idVal.replace(/'/g,"\\'")}',this.checked)"></div>
+      </div>
+      <div class="linked-note">↔ Linked to progeny record — changes here also update that row.</div>`;
+  } else {
+    const aliveVal = cage[aliveKey] !== false;
+    const canKill = (cage[dispKey]||'').trim() && cage[dispDateKey];
+    const aliveDisabled = (disabled?true:false) || (aliveVal && !canKill);
+    dispHtml = `
+      <div class="parent-disp">
+        <div class="field"><label>Disposition</label>
+          <input value="${esc(cage[dispKey])}" ${disabled} placeholder="e.g. culled / retired"
+            onchange="upd(${ci},'${dispKey}',this.value)"></div>
+        <div class="field"><label>Disposition date</label>
+          <input type="date" value="${esc(cage[dispDateKey])}" ${disabled}
+            onchange="upd(${ci},'${dispDateKey}',this.value)"></div>
+        <div class="alive-box"><label>Alive</label>
+          <input type="checkbox" ${aliveVal?'checked':''} ${aliveDisabled?'disabled':''}
+            onchange="setCageParentAlive(${ci},'${which}',this.checked)"></div>
+      </div>`;
+  }
+
   div.innerHTML = `
     <h5>${isF?'♀ Female':'♂ Male'}</h5>
     <div class="row">
@@ -697,8 +769,74 @@ function parentBlock(which, cage, ci, disabled){
           onchange="upd(${ci},'${idKey}',this.value);render()"></div>
       ${lineageControls}
     </div>
-    ${resolveHtml}`;
+    ${resolveHtml}
+    ${dispHtml}`;
   return div;
+}
+
+/* ---------- Parent disposition: linked (synced to progeny row) ---------- */
+function findMouseRefById(id){
+  id = String(id||'').trim();
+  if(!id) return null;
+  for(let ci=0; ci<colony.length; ci++){
+    const mice = colony[ci].mice;
+    for(let mi=0; mi<mice.length; mi++){
+      if(String(mice[mi].mouseId).trim() === id){
+        // prefer a live one, but a single id is unique so first match is fine
+        if(mice[mi].alive) return {ci, mi, mouse:mice[mi]};
+      }
+    }
+  }
+  // fall back to any (e.g. already dead)
+  for(let ci=0; ci<colony.length; ci++){
+    const mice = colony[ci].mice;
+    for(let mi=0; mi<mice.length; mi++){
+      if(String(mice[mi].mouseId).trim() === id) return {ci, mi, mouse:mice[mi]};
+    }
+  }
+  return null;
+}
+
+function updParentLinkedDisp(id, key, val){
+  const ref = findMouseRefById(id);
+  if(!ref) return;
+  if(locked(colony[ref.ci]) || locked(ref.mouse)){ render(); return; }
+  ref.mouse[key] = val;
+  save();
+  render();
+}
+function setParentLinkedAlive(id, checked){
+  const ref = findMouseRefById(id);
+  if(!ref) return;
+  const m = ref.mouse;
+  if(locked(colony[ref.ci]) || locked(m)){ render(); return; }
+  if(checked===false){
+    if(!(m.disposition.trim() && m.dispositionDate)){
+      alert('To mark this parent as not alive, fill in both Disposition and a Disposition Date first.');
+      render(); return;
+    }
+  }
+  m.alive = checked;
+  save();
+  render();
+}
+
+/* ---------- Parent disposition: standalone (cage-level) ---------- */
+function setCageParentAlive(ci, which, checked){
+  const c = colony[ci];
+  if(locked(c)){ render(); return; }
+  const dispKey = which==='female' ? 'femaleDisposition' : 'maleDisposition';
+  const dispDateKey = which==='female' ? 'femaleDispositionDate' : 'maleDispositionDate';
+  const aliveKey = which==='female' ? 'femaleAlive' : 'maleAlive';
+  if(checked===false){
+    if(!((c[dispKey]||'').trim() && c[dispDateKey])){
+      alert('To mark this parent as not alive, fill in both Disposition and a Disposition Date first.');
+      render(); return;
+    }
+  }
+  c[aliveKey] = checked;
+  save();
+  render();
 }
 
 function field(label,val,ci,key,disabled=''){
@@ -734,20 +872,22 @@ function setWeanFilterOn(){ if(!filterWean) toggleWean(); }
 function setActiveFilterOn(){ if(!filterActive) toggleActive(); }
 function setSampleFilterPending(){ document.getElementById('fSample').value='Pending'; render(); }
 
-/* ---------- Edit handlers (all respect the lock) ---------- */
+/* ---------- Edit handlers ---------- */
 function upd(ci,key,val){ if(locked(colony[ci]))return; colony[ci][key]=val; save(); }
 function updM(ci,mi,key,val){ if(locked(colony[ci])||locked(colony[ci].mice[mi]))return; colony[ci].mice[mi][key]=val; save(); }
 function updE(ci,ei,key,val){ const e=colony[ci].events[ei]; if(locked(colony[ci])||e.locked)return; e[key]=val; save(); }
 
-/* ---------- Date updates WITHOUT a full re-render ----------
-   The previous version called render() inside the date input's onchange,
-   which rebuilt the input mid-edit and scrambled keyboard-typed years.
-   These handlers update state + persist, then refresh only the small
-   derived bits (age cell, wean tag, stats) for the affected row.
-*/
+/* Mouse disposition edits — re-render so that any parent block referencing this
+   mouse stays in sync (the parent block reads disposition live). */
+function updMDisp(ci,mi,key,val){
+  if(locked(colony[ci])||locked(colony[ci].mice[mi]))return;
+  colony[ci].mice[mi][key]=val;
+  save();
+  render();
+}
+
 function refreshRowAge(ci, mi){
   const m = colony[ci].mice[mi];
-  // Find the matching row in the DOM and update just its age cell.
   document.querySelectorAll('tr[data-ci][data-mi]').forEach(tr=>{
     if(Number(tr.dataset.ci)===ci && Number(tr.dataset.mi)===mi){
       const ageCell = tr.querySelector('.age-cell');
@@ -764,13 +904,15 @@ function updDob(ci,mi,val){
   if(locked(colony[ci])||locked(colony[ci].mice[mi]))return;
   colony[ci].mice[mi].dob = val;
   save();
-  refreshRowAge(ci, mi);
+  // a parent block auto-fills DOB from a linked mouse — re-render if used as parent
+  if(parentRefsOfMouse(colony[ci].mice[mi]).length){ render(); }
+  else { refreshRowAge(ci, mi); }
 }
 function updWeaning(ci,mi,val){
   if(locked(colony[ci])||locked(colony[ci].mice[mi]))return;
   colony[ci].mice[mi].weaningDate = val;
   save();
-  refreshRowAge(ci, mi);   // weaning affects wean-ready status
+  refreshRowAge(ci, mi);
 }
 
 /* Mouse ID edit — alphanumeric, must be unique */
@@ -778,7 +920,6 @@ function updMouseId(ci,mi,input){
   const m = colony[ci].mice[mi];
   if(locked(colony[ci])||locked(m)){ render(); return; }
   const raw = String(input.value||'').trim();
-  // strip anything that isn't alphanumeric
   const cleaned = raw.replace(/[^A-Za-z0-9]/g,'');
   if(cleaned !== raw){
     alert('Mouse ID must be alphanumeric (letters and numbers only). Invalid characters were removed.');
@@ -794,7 +935,7 @@ function updMouseId(ci,mi,input){
   render();
 }
 
-/* Ear punch edit — numeric only */
+/* Ear punch edit — numeric only, may repeat across the colony */
 function updEarPunch(ci,mi,input){
   const m = colony[ci].mice[mi];
   if(locked(colony[ci])||locked(m)){ render(); return; }
@@ -808,7 +949,7 @@ function updEarPunch(ci,mi,input){
   save();
 }
 
-/* Alive ↔ disposition rule */
+/* Alive ↔ disposition rule (progeny rows) */
 function setAlive(ci,mi,checked){
   const m = colony[ci].mice[mi];
   if(locked(colony[ci])||locked(m)){ render(); return; }
@@ -819,21 +960,21 @@ function setAlive(ci,mi,checked){
     }
   }
   m.alive = checked;
-  render();
+  render();   // re-render keeps any parent block referencing this mouse in sync
 }
 
 function addCage(){ colony.push(blankCage()); render(); }
 function delCage(ci){ if(locked(colony[ci]))return; if(confirm('Delete mating "'+colony[ci].cage+'" and all its progeny?')){ colony.splice(ci,1); render(); } }
 function toggleCageActive(ci){ if(locked(colony[ci]))return; colony[ci].active=!colony[ci].active; render(); }
 
-/* Add progeny: unique auto ID, autofill DOB & weaning date from the row above */
+/* Add progeny: cage-aware then global ID; ear punch from cage-then-global numeric */
 function addMouse(ci){
   if(locked(colony[ci]))return;
   const cage = colony[ci];
   const prev = cage.mice.length ? cage.mice[cage.mice.length-1] : null;
   const mo = blankMouse();
-  mo.mouseId = nextMouseId();
-  mo.earPunch = mo.mouseId.replace(/[^0-9]/g,'');  // numeric portion only
+  mo.mouseId = nextMouseId(cage);
+  mo.earPunch = nextEarPunch(cage);
   if(prev){
     mo.dob = prev.dob || '';
     mo.weaningDate = prev.weaningDate || '';
@@ -847,22 +988,55 @@ function delEvent(ci,ei){ const e=colony[ci].events[ei]; if(locked(colony[ci])||
 function toggleEventLock(ci,ei){ if(locked(colony[ci]))return; const e=colony[ci].events[ei]; e.locked=!e.locked; render(); }
 function clearAll(){ if(confirm('Clear everything? Export first if needed.')){ colony=[]; colonyName=''; const cn=document.getElementById('colonyName'); if(cn) cn.value=''; editUnlocked=true; render(); } }
 
-/* ---------- Auto-increment ID (never repeats) ---------- */
-function nextMouseId(){
+/* ---------- Auto-increment helpers ----------
+   nextMouseId: start from the highest numeric ID in the CURRENT cage, fall back
+   to the global highest, then increment — but uniqueness is only ever checked
+   against the global ID set (IDs must be unique colony-wide).
+*/
+function highestNumericIdIn(mice){
   let max = 0;
-  colony.forEach(c=>c.mice.forEach(m=>{
-    const n = parseInt(m.mouseId,10);
-    if(!isNaN(n) && String(n) === String(m.mouseId).trim() && n>max) max=n;
-  }));
-  const taken = allMouseIds(null);
-  let candidate = max + 1;
+  mice.forEach(m=>{
+    const s = String(m.mouseId||'').trim();
+    const n = parseInt(s,10);
+    if(!isNaN(n) && String(n) === s && n>max) max=n;
+  });
+  return max;
+}
+function nextMouseId(cage){
+  // prefer continuing this cage's numbering, otherwise the global highest
+  let base = cage ? highestNumericIdIn(cage.mice) : 0;
+  const globalMax = highestNumericIdIn(colony.flatMap(c=>c.mice));
+  if(globalMax > base) base = globalMax;
+
+  const taken = allMouseIds(null);   // global uniqueness check only
+  let candidate = base + 1;
   while(taken.has(String(candidate).toLowerCase())) candidate++;
   return String(candidate);
 }
 
+/* nextEarPunch: punches may repeat globally (e.g. 5 / 105 / 205), so we only
+   continue the current cage's sequence and do NOT enforce global uniqueness. */
+function highestNumericPunchIn(mice){
+  let max = 0;
+  mice.forEach(m=>{
+    const n = parseInt(String(m.earPunch||'').trim(),10);
+    if(!isNaN(n) && n>max) max=n;
+  });
+  return max;
+}
+function nextEarPunch(cage){
+  let base = cage ? highestNumericPunchIn(cage.mice) : 0;
+  if(base === 0){
+    // no punch in this cage yet — seed from the global highest as a hint
+    base = highestNumericPunchIn(colony.flatMap(c=>c.mice));
+  }
+  return String(base + 1);
+}
+
 /* ---------- Search matching ---------- */
 function cageMatches(c,q){
-  return [c.cage,c.femaleId,c.maleId,c.femaleLineage,c.maleLineage,c.femaleLineageParent,c.maleLineageParent,c.datePaired].join(' ').toLowerCase().includes(q);
+  return [c.cage,c.femaleId,c.maleId,c.femaleLineage,c.maleLineage,c.femaleLineageParent,c.maleLineageParent,
+          c.femaleDisposition,c.maleDisposition,c.datePaired].join(' ').toLowerCase().includes(q);
 }
 function mouseHaystack(m){
   return [m.mouseId,m.earPunch,m.sex,m.sampleStatus,m.disposition,m.notes,m.dob].join(' ').toLowerCase();
@@ -871,7 +1045,7 @@ function mouseHaystack(m){
 /* ---------- Helpers ---------- */
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-/* ---------- JSON (full-fidelity store) ---------- */
+/* ---------- JSON ---------- */
 function buildJSON(){
   return JSON.stringify({version:APP_VERSION, colonyName, matings:colony}, null, 2);
 }
@@ -879,7 +1053,6 @@ function exportJSON(){
   download('mouse_colony.json', buildJSON(), 'application/json');
 }
 
-/* Copy the full JSON export to the clipboard */
 function copyJSON(btn){
   const text = buildJSON();
   const done = ()=>{
@@ -905,10 +1078,9 @@ function fallbackCopy(text, done){
   document.body.removeChild(ta);
 }
 
-/* Shared loader for both file import and pasted text */
 function loadParsed(parsed){
   let d;
-  if(Array.isArray(parsed)){ d = parsed; }                       // legacy format
+  if(Array.isArray(parsed)){ d = parsed; }
   else if(parsed && Array.isArray(parsed.matings)){ d = parsed.matings; colonyName = parsed.colonyName||colonyName; }
   else throw new Error('bad shape');
   colony = d.map(normCage);
@@ -925,24 +1097,9 @@ function importJSON(input){
   r.readAsText(file); input.value='';
 }
 
-/* Import JSON pasted into the small text box */
-function importPasted(){
-  const box = document.getElementById('pasteJson');
-  const txt = (box.value||'').trim();
-  if(!txt){ alert('Paste JSON into the box first.'); return; }
-  let parsed;
-  try{ parsed = JSON.parse(txt); }
-  catch{ alert('Invalid JSON — could not parse the pasted text.'); return; }
-  try{
-    if(colony.length && !confirm('This will replace all current data. Continue?')) return;
-    loadParsed(parsed);
-    box.value = '';
-  }catch{ alert('JSON parsed, but it is not a valid colony export.'); }
-}
-
-/* ---------- CSV (export only — quick-view snapshot) ---------- */
-const CSV_HEADERS = ['Colony/Strain','MATING','Female Parent ID','Female Parent Dob',
-  'Male Parent ID','Male Parent DOB','Mouse ID','Ear Punch','Sex','DOB',
+/* ---------- CSV ---------- */
+const CSV_HEADERS = ['Colony/Strain','MATING','Female Parent ID','Female Parent Dob','Female Disposition',
+  'Male Parent ID','Male Parent DOB','Male Disposition','Mouse ID','Ear Punch','Sex','DOB',
   'Weaning Date','Genotyping Status','Disposition','Disposition Date','Notes'];
 
 function parentLabel(which, c){
@@ -964,6 +1121,21 @@ function parentLabel(which, c){
   return [lineage, mode, ref].filter(Boolean).join(' ').trim();
 }
 
+/* Disposition label for a parent — pulled from the linked progeny row if it exists */
+function parentDispLabel(which, c){
+  const isF = which==='female';
+  const id  = (isF ? c.femaleId : c.maleId) || '';
+  const known = findKnownMouse(id);
+  if(known){
+    const m = known.mouse;
+    return [m.disposition, m.dispositionDate, m.alive?'':'(not alive)'].filter(Boolean).join(' ').trim();
+  }
+  const disp = isF ? c.femaleDisposition : c.maleDisposition;
+  const dispDate = isF ? c.femaleDispositionDate : c.maleDispositionDate;
+  const alive = (isF ? c.femaleAlive : c.maleAlive) !== false;
+  return [disp, dispDate, alive?'':'(not alive)'].filter(Boolean).join(' ').trim();
+}
+
 function exportCSV(){
   const rows = [CSV_HEADERS];
 
@@ -971,8 +1143,8 @@ function exportCSV(){
     const meta = [
       colonyName,
       c.cage,
-      parentLabel('female', c), c.femaleDob,
-      parentLabel('male',   c), c.maleDob
+      parentLabel('female', c), c.femaleDob, parentDispLabel('female', c),
+      parentLabel('male',   c), c.maleDob,   parentDispLabel('male', c)
     ];
 
     if(!c.mice.length){

@@ -389,7 +389,7 @@
 <!-- ===================== START PANEL ===================== -->
 <div id="startOverlay" style="display:none">
   <div class="start-card">
-    <h2>🐭 Mouse Colony Manager <span class="version-badge">v3.1</span></h2>
+    <h2>🐭 Mouse Colony Manager <span class="version-badge">v3.0</span></h2>
     <p class="start-sub">No saved data was found in this browser. Start a fresh sheet, or bring in an existing colony from a file, a link, or pasted JSON.</p>
 
     <div class="start-fresh-bar">
@@ -1299,7 +1299,7 @@ function setAlive(ci,mi,checked){
 }
 
 <!-- function addCage(){ colony.push(blankCage()); render(); } -->
-function addCage(){ colony.unshift(blankCage()); render(); }	
+function addCage(){ colony.unshift(blankCage()); render(); }
 function delCage(ci){ if(locked(colony[ci]))return; if(confirm('Delete mating "'+colony[ci].cage+'" and all its progeny?')){ colony.splice(ci,1); render(); } }
 function toggleCageActive(ci){ if(locked(colony[ci]))return; colony[ci].active=!colony[ci].active; render(); }
 

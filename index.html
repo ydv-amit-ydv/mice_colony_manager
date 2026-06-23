@@ -22,6 +22,8 @@
     --warn-soft: #fff4e6;
     --pending: #9c36b5;
     --pending-soft: #f8f0fc;
+    --lock: #b08900;
+    --lock-soft: #fff9db;
   }
   * { box-sizing: border-box; }
   body {
@@ -64,6 +66,9 @@
   button.primary:hover { background: #2f5ad8; color: #fff; }
   button.danger:hover { border-color: var(--female); color: var(--female); }
   button.tiny { padding: 4px 9px; font-size: 12px; }
+  button:disabled, input:disabled, select:disabled {
+    opacity: .55; cursor: not-allowed;
+  }
   input[type=file] { display: none; }
   .stats {
     display: flex;
@@ -83,7 +88,15 @@
   .stat.clickable { cursor: pointer; }
   .stat.clickable:hover { outline: 2px solid var(--accent); }
 
-  main { padding: 18px 20px 60px; max-width: 1600px; margin: 0 auto; }
+  .lockbar {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--lock-soft); border: 1px solid #f0e6b0;
+    border-radius: 8px; padding: 6px 12px; font-size: 13px;
+  }
+  .lockbar.unlocked { background: var(--ok-soft); border-color: #b2e2bd; }
+  .lockbar b { font-weight: 700; }
+
+  main { padding: 18px 20px 60px; max-width: 1700px; margin: 0 auto; }
   .searchbar { margin-bottom: 16px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
   .searchbar input[type=text] {
     flex: 1; min-width: 220px;
@@ -94,7 +107,6 @@
     padding: 8px 11px; border:1px solid var(--line); border-radius:8px; background:var(--panel); font-size:13px;
   }
   .filters button.active, .filters select.active { background: var(--accent); color:#fff; border-color: var(--accent); }
-  .view-toggle button.active { background: var(--accent); color:#fff; border-color: var(--accent); }
 
   .cage {
     background: var(--panel);
@@ -104,6 +116,7 @@
     overflow: hidden;
   }
   .cage.inactive { opacity: .7; }
+  .cage.locked-card { border-color: #f0e6b0; }
   .cage-head {
     padding: 12px 16px;
     display: flex;
@@ -120,7 +133,8 @@
     padding: 3px 6px;
     font: inherit;
   }
-  .cage-head input:focus, .cage-head select:focus, td input:focus, td select:focus {
+  .cage-head input:focus, .cage-head select:focus, td input:focus, td select:focus,
+  .lineage input:focus {
     outline: none; border-color: var(--accent); background:#fff;
   }
   .cage-title { font-size: 16px; font-weight: 700; min-width: 110px; }
@@ -130,9 +144,19 @@
   .field input[type=date] { min-width: 130px; }
   .cage-actions { margin-left: auto; display:flex; gap:6px; align-items:center; }
 
+  /* Lineage pairing block */
+  .lineage-wrap { display:flex; gap:18px; flex-wrap:wrap; padding:10px 16px; border-bottom:1px solid var(--line); background:#fcfdff; }
+  .lineage { border:1px solid var(--line); border-radius:10px; padding:8px 12px; min-width:260px; }
+  .lineage h5 { margin:0 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  .lineage.female h5 { color: var(--female); }
+  .lineage.male h5 { color: var(--male); }
+  .lineage .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .lineage .field input { border:1px solid var(--line); background:#fff; }
+
   .status-badge { font-size:11px; padding:3px 9px; border-radius:20px; font-weight:600; }
   .status-active { background: var(--ok-soft); color: var(--ok); }
   .status-inactive { background:#f1f3f5; color: var(--muted); }
+  .lock-badge { background: var(--lock-soft); color: var(--lock); }
 
   table { width: 100%; border-collapse: collapse; }
   th {
@@ -149,13 +173,13 @@
   .sex-Unknown { color: var(--unknown); font-weight:600; }
   .age-cell { font-size:13px; color: var(--muted); white-space:nowrap; }
   .age-cell.wean-ready { color: var(--warn); font-weight:700; }
-  .geno-Pending { color: var(--pending); }
-  .geno-Collected { color: var(--warn); }
-  .geno-Result\ in { color: var(--ok); }
+  .samp-Pending { color: var(--pending); }
+  .samp-Sample\ collected { color: var(--warn); }
+  .samp-Confirmed { color: var(--ok); }
+  .samp-Not\ confirmed { color: var(--female); }
   .row-del { color: var(--muted); cursor:pointer; border:none; background:none; font-size:16px; padding:0 4px;}
   .row-del:hover { color: var(--female); }
   .wean-tag { font-size:10px; background:var(--warn-soft); color:var(--warn); padding:1px 6px; border-radius:10px; margin-left:5px; font-weight:700; }
-  .add-mouse { margin: 8px 12px; }
   .empty { padding: 50px; text-align:center; color: var(--muted); }
   .pill { font-size:11px; padding:2px 8px; border-radius:20px; background:var(--accent-soft); color:var(--accent); }
   .note-cell input { color: var(--muted); font-size:13px; min-width: 220px; }
@@ -164,11 +188,13 @@
   .breeding { padding: 10px 16px; border-top: 1px dashed var(--line); background:#fbfcfd; }
   .breeding h4 { margin:0 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
   .event-row { display:flex; gap:8px; align-items:center; margin-bottom:6px; flex-wrap:wrap; }
+  .event-row.locked { background: var(--lock-soft); border-radius:6px; padding:3px 4px; }
   .event-row input, .event-row select { border:1px solid var(--line); border-radius:6px; padding:5px 7px; font:inherit; background:#fff; }
   .event-row .e-type { min-width:130px; }
   .event-row .e-date { min-width:140px; }
   .event-row .e-detail { flex:1; min-width:160px; }
-  .event-row .e-count { width:70px; }
+  .event-lock { border:none; background:none; cursor:pointer; font-size:15px; padding:0 4px; color:var(--muted); }
+  .event-lock.on { color: var(--lock); }
   .no-events { color:var(--muted); font-size:13px; margin-bottom:6px; }
 
   footer { text-align:center; color:var(--muted); font-size:12px; padding:20px; }
@@ -190,23 +216,22 @@
 </header>
 
 <main>
-  <div class="searchbar">
-    <input type="text" id="search" placeholder="Search cage, mouse ID, sex, genotype, notes…" oninput="render()">
+  <div id="lockbar" class="lockbar"></div>
+
+  <div class="searchbar" style="margin-top:14px">
+    <input type="text" id="search" placeholder="Search cage, mouse ID, sex, sample status, lineage, notes…" oninput="render()">
     <div class="filters">
-      <select id="fGeno" onchange="render()">
-        <option value="">Genotype: all</option>
+      <select id="fSample" onchange="render()">
+        <option value="">Sample: all</option>
+        <option value="Sample collected">Sample collected</option>
         <option value="Pending">Pending</option>
-        <option value="Collected">Collected</option>
-        <option value="Result in">Result in</option>
+        <option value="Confirmed">Confirmed</option>
+        <option value="Not confirmed">Not confirmed</option>
         <option value="None">No status</option>
       </select>
       <button id="fWean" onclick="toggleWean()">Wean-ready only</button>
       <button id="fActive" onclick="toggleActive()">Active matings only</button>
     </div>
-    <span class="view-toggle">
-      <button id="vMice" class="active" onclick="setView('mice')">By mouse</button>
-      <button id="vGrid" onclick="setView('grid')">Compact</button>
-    </span>
   </div>
   <div id="content"></div>
 </main>
@@ -217,30 +242,88 @@
 /* ---------- Constants ---------- */
 const WEAN_AGE_DAYS = 21;
 const SEXES = ['Female','Male','Unknown'];
-const GENO_STATUS = ['','Pending','Collected','Result in'];
+const SAMPLE_STATUS = ['','Sample collected','Pending','Confirmed','Not confirmed'];
 const EVENT_TYPES = ['Paired','Plug observed','Litter born','Weaned','Male separated','Female separated','Re-paired','Disbanded','Note'];
-const STORAGE_KEY = 'mouseColony.v2';
+const STORAGE_KEY = 'mouseColony.v3';
+const LOCK_KEY = 'mouseColony.masterCode';
 
 /* ---------- Data model ---------- */
 let colony = [];   // array of cages
-let view = 'mice';
 let filterWean = false;
 let filterActive = false;
+let editUnlocked = false;   // master lock state for the session
 
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 
 function blankMouse() {
   return { dob:'', mouseId:'', earPunch:'', sex:'Female', weaningDate:'',
-           genotype:'', genoStatus:'', disposition:'', alive:true, notes:'' };
+           sampleStatus:'', disposition:'', dispositionDate:'', alive:true, notes:'',
+           _new:true };
 }
 function blankCage() {
-  return { cage:'New_Cage', pairing:'', datePaired:'', active:true,
-           litterNote:'', events:[], mice:[blankMouse()] };
+  return { cage:'New_Cage',
+           femaleLineage:'', femaleDob:'',
+           maleLineage:'', maleDob:'',
+           datePaired:'', active:true,
+           litterNote:'', events:[], mice:[blankMouse()],
+           _new:true };
 }
-function blankEvent(){ return { type:'Litter born', date:todayISO(), count:'', detail:'' }; }
+function blankEvent(){ return { type:'Litter born', date:todayISO(), detail:'', locked:false, _new:true }; }
+
+/* ---------- Lock helpers ----------
+   _new === true  → freshly added in this session, always editable.
+   _new !== true  → imported/old data, editable only when editUnlocked === true.
+*/
+function locked(obj){ return obj && obj._new !== true && !editUnlocked; }
+function ro(obj){ return locked(obj) ? 'disabled' : ''; }   // returns disabled attr for inputs
+
+function hasMasterCode(){ return !!localStorage.getItem(LOCK_KEY); }
+function setMasterCode(){
+  const code = prompt('Set a master edit code. Imported/old data will be locked until this code is entered.');
+  if(code==null || code==='') return;
+  localStorage.setItem(LOCK_KEY, code);
+  editUnlocked = false;
+  alert('Master code set. Old data is now locked.');
+  render();
+}
+function unlock(){
+  if(!hasMasterCode()){ setMasterCode(); return; }
+  const code = prompt('Enter master edit code to unlock old data:');
+  if(code===null) return;
+  if(code === localStorage.getItem(LOCK_KEY)){ editUnlocked = true; render(); }
+  else alert('Incorrect code.');
+}
+function lockNow(){ editUnlocked = false; render(); }
+function changeMasterCode(){
+  if(hasMasterCode()){
+    const cur = prompt('Enter current master code:');
+    if(cur !== localStorage.getItem(LOCK_KEY)){ alert('Incorrect code.'); return; }
+  }
+  setMasterCode();
+}
+function clearMasterCode(){
+  if(!hasMasterCode()) return;
+  const cur = prompt('Enter current master code to remove the lock entirely:');
+  if(cur !== localStorage.getItem(LOCK_KEY)){ alert('Incorrect code.'); return; }
+  localStorage.removeItem(LOCK_KEY); editUnlocked = true; render();
+}
+
+/* mark every existing record as "old" (locked candidate) */
+function markAllOld(){
+  colony.forEach(c=>{
+    c._new = false;
+    c.mice.forEach(m=> m._new = false);
+    c.events.forEach(e=> e._new = false);
+  });
+}
 
 /* ---------- Persistence ---------- */
-function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(colony)); }catch(e){} }
+function save(){
+  try{
+    // strip the volatile _new flag is NOT desirable: we keep it so session-added stays editable
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(colony));
+  }catch(e){}
+}
 function load(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -250,10 +333,14 @@ function load(){
 }
 function normCage(c){
   return {
-    cage:c.cage||'', pairing:c.pairing||'', datePaired:c.datePaired||'',
+    cage:c.cage||'',
+    femaleLineage:c.femaleLineage||'', femaleDob:c.femaleDob||'',
+    maleLineage:c.maleLineage||'', maleDob:c.maleDob||'',
+    datePaired:c.datePaired||'',
     active: c.active!==false, litterNote:c.litterNote||'',
-    events:(c.events||[]).map(e=>({type:e.type||'Note',date:e.date||'',count:e.count||'',detail:e.detail||''})),
-    mice:(c.mice||[]).map(m=>({...blankMouse(),...m, alive: m.alive!==false}))
+    events:(c.events||[]).map(e=>({type:e.type||'Note',date:e.date||'',detail:e.detail||'',locked:!!e.locked, _new:!!e._new})),
+    mice:(c.mice||[]).map(m=>({...blankMouse(),...m, alive: m.alive!==false, _new:!!m._new})),
+    _new:!!c._new
   };
 }
 
@@ -272,6 +359,7 @@ function ageLabel(dob){
   const w = Math.floor(days/7), d = days%7;
   return `${w}w ${d}d`;
 }
+/* Wean flag clears the moment a weaning date is filled; reappears if cleared */
 function isWeanReady(m){
   const days = ageDays(m.dob);
   return m.alive && days!==null && days>=WEAN_AGE_DAYS && !m.weaningDate;
@@ -287,17 +375,37 @@ function nextMouseId(){
   return String(max+1);
 }
 
-/* ---------- Rendering ---------- */
-function setView(v){ view=v;
-  document.getElementById('vMice').classList.toggle('active',v==='mice');
-  document.getElementById('vGrid').classList.toggle('active',v==='grid'); render(); }
+/* ---------- Filters ---------- */
 function toggleWean(){ filterWean=!filterWean; document.getElementById('fWean').classList.toggle('active',filterWean); render(); }
 function toggleActive(){ filterActive=!filterActive; document.getElementById('fActive').classList.toggle('active',filterActive); render(); }
 
+function renderLockBar(){
+  const el = document.getElementById('lockbar');
+  if(!hasMasterCode()){
+    el.className = 'lockbar';
+    el.innerHTML = `🔓 <span>No master code set — all data is editable.</span>
+      <button class="tiny" onclick="setMasterCode()">Set master code</button>`;
+    return;
+  }
+  if(editUnlocked){
+    el.className = 'lockbar unlocked';
+    el.innerHTML = `🔓 <b>Unlocked</b> <span>— old/imported data is editable this session.</span>
+      <button class="tiny" onclick="lockNow()">Lock now</button>
+      <button class="tiny" onclick="changeMasterCode()">Change code</button>
+      <button class="tiny" onclick="clearMasterCode()">Remove lock</button>`;
+  } else {
+    el.className = 'lockbar';
+    el.innerHTML = `🔒 <b>Locked</b> <span>— old/imported data is read-only. Newly added items stay editable.</span>
+      <button class="tiny primary" onclick="unlock()">Unlock to edit</button>`;
+  }
+}
+
+/* ---------- Rendering ---------- */
 function render() {
   save();
+  renderLockBar();
   const q = document.getElementById('search').value.trim().toLowerCase();
-  const genoFilter = document.getElementById('fGeno').value;
+  const sampleFilter = document.getElementById('fSample').value;
   const root = document.getElementById('content');
   root.innerHTML = '';
   updateStats();
@@ -309,77 +417,104 @@ function render() {
   colony.forEach((cage, ci) => {
     if(filterActive && !cage.active) return;
 
-    // sort events by date
     cage.events.sort((a,b)=> (a.date||'').localeCompare(b.date||''));
 
     const matchMouse = m => {
-      if(q && !(cageMatches(cage,q) || Object.values(m).join(' ').toLowerCase().includes(q))) return false;
+      if(q && !(cageMatches(cage,q) || mouseHaystack(m).includes(q))) return false;
       if(filterWean && !isWeanReady(m)) return false;
-      if(genoFilter){
-        if(genoFilter==='None'){ if(m.genoStatus) return false; }
-        else if(m.genoStatus!==genoFilter) return false;
+      if(sampleFilter){
+        if(sampleFilter==='None'){ if(m.sampleStatus) return false; }
+        else if(m.sampleStatus!==sampleFilter) return false;
       }
       return true;
     };
 
     const visibleMice = cage.mice.map((m,mi)=>({m,mi})).filter(({m})=>matchMouse(m));
     const cageHeaderMatches = (!q || cageMatches(cage,q));
-    const noMouseFilters = !filterWean && !genoFilter;
+    const noMouseFilters = !filterWean && !sampleFilter;
 
-    // decide whether to show the cage
     if(!visibleMice.length){
       if(!(noMouseFilters && cageHeaderMatches)) return;
     }
     anyShown = true;
 
+    const cardLocked = locked(cage);
     const card = document.createElement('div');
-    card.className = 'cage' + (cage.active?'':' inactive');
+    card.className = 'cage' + (cage.active?'':' inactive') + (cardLocked?' locked-card':'');
 
     const aliveCount = cage.mice.filter(m=>m.alive).length;
+    const cDis = ro(cage);
 
     // header
     const head = document.createElement('div');
     head.className = 'cage-head';
     head.innerHTML = `
-      <input class="cage-title" value="${esc(cage.cage)}" onchange="upd(${ci},'cage',this.value)">
-      ${field('Pairing (♀+♂)', cage.pairing, ci,'pairing')}
-      ${dateField('Date Paired', cage.datePaired, ci,'datePaired')}
-      ${field('Litter / Weaned', cage.litterNote, ci,'litterNote')}
+      <input class="cage-title" value="${esc(cage.cage)}" ${cDis} onchange="upd(${ci},'cage',this.value)">
+      ${dateField('Date Paired', cage.datePaired, ci,'datePaired', cDis)}
+      ${field('Litter / Weaned', cage.litterNote, ci,'litterNote', cDis)}
       <span class="pill">${aliveCount} alive / ${cage.mice.length}</span>
       <span class="status-badge ${cage.active?'status-active':'status-inactive'}">${cage.active?'Active mating':'Inactive'}</span>
+      ${cardLocked?'<span class="status-badge lock-badge">🔒 locked</span>':''}
       <div class="cage-actions">
-        <button class="tiny" onclick="toggleCageActive(${ci})">${cage.active?'Mark inactive':'Mark active'}</button>
-        <button class="tiny" onclick="addMouse(${ci})">＋ Mouse</button>
-        <button class="tiny danger" onclick="delCage(${ci})">🗑 Cage</button>
+        <button class="tiny" ${cDis} onclick="toggleCageActive(${ci})">${cage.active?'Mark inactive':'Mark active'}</button>
+        <button class="tiny" ${cDis} onclick="addMouse(${ci})">＋ Mouse</button>
+        <button class="tiny danger" ${cDis} onclick="delCage(${ci})">🗑 Cage</button>
       </div>`;
     card.appendChild(head);
+
+    // lineage block (separate Female / Male lineage + DOB)
+    const lin = document.createElement('div');
+    lin.className = 'lineage-wrap';
+    lin.innerHTML = `
+      <div class="lineage female">
+        <h5>♀ Female</h5>
+        <div class="row">
+          ${field('Lineage', cage.femaleLineage, ci,'femaleLineage', cDis)}
+          ${dateField('DOB', cage.femaleDob, ci,'femaleDob', cDis)}
+        </div>
+      </div>
+      <div class="lineage male">
+        <h5>♂ Male</h5>
+        <div class="row">
+          ${field('Lineage', cage.maleLineage, ci,'maleLineage', cDis)}
+          ${dateField('DOB', cage.maleDob, ci,'maleDob', cDis)}
+        </div>
+      </div>`;
+    card.appendChild(lin);
 
     // table
     const tbl = document.createElement('table');
     tbl.innerHTML = `<thead><tr>
       <th>Mouse ID</th><th>DOB</th><th>Age</th><th>Ear Punch</th><th>Sex</th>
-      <th>Weaning Date</th><th>Genotype</th><th>Geno Status</th><th>Disposition</th>
-      <th>Alive</th>${view==='mice'?'<th>Notes</th>':''}<th></th></tr></thead>`;
+      <th>Weaning Date</th><th>Sample Status</th><th>Disposition</th><th>Disp. Date</th>
+      <th>Alive</th><th>Notes</th><th></th></tr></thead>`;
     const tb = document.createElement('tbody');
-    const rowsToShow = (q||filterWean||genoFilter) ? visibleMice : cage.mice.map((m,mi)=>({m,mi}));
+    const filtersOn = (q||filterWean||sampleFilter);
+    const rowsToShow = filtersOn ? visibleMice : cage.mice.map((m,mi)=>({m,mi}));
     rowsToShow.forEach(({m,mi}) => {
       const weanReady = isWeanReady(m);
+      const mDis = ro(m);
+      // Alive checkbox can only be UNCHECKED when disposition + disposition date are filled.
+      // So if mouse is currently alive and lacks disposition info, disable the checkbox.
+      const canKill = m.disposition.trim() && m.dispositionDate;
+      const aliveDisabled = mDis || (m.alive && !canKill);
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td class="id-col"><input value="${esc(m.mouseId)}" onchange="updM(${ci},${mi},'mouseId',this.value)"></td>
-        <td><input type="date" value="${esc(m.dob)}" onchange="updM(${ci},${mi},'dob',this.value)"></td>
+        <td class="id-col"><input value="${esc(m.mouseId)}" ${mDis} onchange="updM(${ci},${mi},'mouseId',this.value)"></td>
+        <td><input type="date" value="${esc(m.dob)}" ${mDis} onchange="updM(${ci},${mi},'dob',this.value);render()"></td>
         <td class="age-cell ${weanReady?'wean-ready':''}">${ageLabel(m.dob)}${weanReady?'<span class="wean-tag">WEAN</span>':''}</td>
-        <td><input value="${esc(m.earPunch)}" onchange="updM(${ci},${mi},'earPunch',this.value)"></td>
-        <td><select class="sex-${esc(m.sex)}" onchange="updM(${ci},${mi},'sex',this.value);render()">
+        <td><input value="${esc(m.earPunch)}" ${mDis} onchange="updM(${ci},${mi},'earPunch',this.value)"></td>
+        <td><select class="sex-${esc(m.sex)}" ${mDis} onchange="updM(${ci},${mi},'sex',this.value);render()">
             ${SEXES.map(s=>`<option ${m.sex===s?'selected':''}>${s}</option>`).join('')}</select></td>
-        <td><input type="date" value="${esc(m.weaningDate)}" onchange="updM(${ci},${mi},'weaningDate',this.value);render()"></td>
-        <td><input value="${esc(m.genotype)}" onchange="updM(${ci},${mi},'genotype',this.value)"></td>
-        <td><select onchange="updM(${ci},${mi},'genoStatus',this.value);render()">
-            ${GENO_STATUS.map(s=>`<option value="${s}" ${m.genoStatus===s?'selected':''}>${s||'—'}</option>`).join('')}</select></td>
-        <td><input value="${esc(m.disposition)}" onchange="updM(${ci},${mi},'disposition',this.value)"></td>
-        <td style="text-align:center"><input type="checkbox" ${m.alive?'checked':''} onchange="updM(${ci},${mi},'alive',this.checked);render()"></td>
-        ${view==='mice'?`<td class="note-cell"><input value="${esc(m.notes)}" onchange="updM(${ci},${mi},'notes',this.value)"></td>`:''}
-        <td><button class="row-del" title="delete" onclick="delMouse(${ci},${mi})">×</button></td>`;
+        <td><input type="date" value="${esc(m.weaningDate)}" ${mDis} onchange="updM(${ci},${mi},'weaningDate',this.value);render()"></td>
+        <td><select class="samp-${esc(m.sampleStatus)}" ${mDis} onchange="updM(${ci},${mi},'sampleStatus',this.value);render()">
+            ${SAMPLE_STATUS.map(s=>`<option value="${s}" ${m.sampleStatus===s?'selected':''}>${s||'—'}</option>`).join('')}</select></td>
+        <td><input value="${esc(m.disposition)}" ${mDis} placeholder="e.g. culled / transferred" onchange="updM(${ci},${mi},'disposition',this.value);render()"></td>
+        <td><input type="date" value="${esc(m.dispositionDate)}" ${mDis} onchange="updM(${ci},${mi},'dispositionDate',this.value);render()"></td>
+        <td style="text-align:center" title="${m.alive && !canKill ? 'Fill Disposition + Disposition Date before marking not alive':''}">
+            <input type="checkbox" ${m.alive?'checked':''} ${aliveDisabled?'disabled':''} onchange="setAlive(${ci},${mi},this.checked)"></td>
+        <td class="note-cell"><input value="${esc(m.notes)}" ${mDis} onchange="updM(${ci},${mi},'notes',this.value)"></td>
+        <td><button class="row-del" title="delete" ${mDis} onclick="delMouse(${ci},${mi})">×</button></td>`;
       tb.appendChild(tr);
     });
     tbl.appendChild(tb);
@@ -391,17 +526,21 @@ function render() {
     let evHtml = '<h4>Breeding events</h4>';
     if(!cage.events.length) evHtml += '<div class="no-events">No events logged yet.</div>';
     cage.events.forEach((ev,ei)=>{
-      evHtml += `<div class="event-row">
-        <select class="e-type" onchange="updE(${ci},${ei},'type',this.value)">
+      const evLocked = locked(cage) || ev.locked;   // master-lock OR per-event lock
+      const eDis = evLocked ? 'disabled' : '';
+      // The lock toggle itself stays usable unless the master lock applies.
+      const lockToggleDis = locked(cage) ? 'disabled' : '';
+      evHtml += `<div class="event-row ${ev.locked?'locked':''}">
+        <button class="event-lock ${ev.locked?'on':''}" title="${ev.locked?'Unlock event (allow delete)':'Lock event (prevent delete)'}" ${lockToggleDis} onclick="toggleEventLock(${ci},${ei})">${ev.locked?'🔒':'🔓'}</button>
+        <select class="e-type" ${eDis} onchange="updE(${ci},${ei},'type',this.value)">
           ${EVENT_TYPES.map(t=>`<option ${ev.type===t?'selected':''}>${t}</option>`).join('')}
         </select>
-        <input class="e-date" type="date" value="${esc(ev.date)}" onchange="updE(${ci},${ei},'date',this.value);render()">
-        <input class="e-count" type="number" min="0" placeholder="count" value="${esc(ev.count)}" onchange="updE(${ci},${ei},'count',this.value)">
-        <input class="e-detail" placeholder="detail (e.g. re-paired with S4)" value="${esc(ev.detail)}" onchange="updE(${ci},${ei},'detail',this.value)">
-        <button class="row-del" onclick="delEvent(${ci},${ei})">×</button>
+        <input class="e-date" type="date" value="${esc(ev.date)}" ${eDis} onchange="updE(${ci},${ei},'date',this.value);render()">
+        <input class="e-detail" placeholder="detail (e.g. re-paired with S4)" value="${esc(ev.detail)}" ${eDis} onchange="updE(${ci},${ei},'detail',this.value)">
+        <button class="row-del" title="${ev.locked?'Locked — cannot delete':'delete'}" ${ev.locked || locked(cage) ?'disabled':''} onclick="delEvent(${ci},${ei})">×</button>
       </div>`;
     });
-    evHtml += `<button class="tiny" onclick="addEvent(${ci})">＋ Event</button>`;
+    evHtml += `<button class="tiny" ${ro(cage)} onclick="addEvent(${ci})">＋ Event</button>`;
     bd.innerHTML = evHtml;
     card.appendChild(bd);
 
@@ -411,11 +550,11 @@ function render() {
   if(!anyShown) root.innerHTML = '<div class="empty">No cages or mice match the current search/filters.</div>';
 }
 
-function field(label,val,ci,key){
-  return `<div class="field"><label>${label}</label><input value="${esc(val||'')}" onchange="upd(${ci},'${key}',this.value)"></div>`;
+function field(label,val,ci,key,disabled=''){
+  return `<div class="field"><label>${label}</label><input value="${esc(val||'')}" ${disabled} onchange="upd(${ci},'${key}',this.value)"></div>`;
 }
-function dateField(label,val,ci,key){
-  return `<div class="field"><label>${label}</label><input type="date" value="${esc(val||'')}" onchange="upd(${ci},'${key}',this.value)"></div>`;
+function dateField(label,val,ci,key,disabled=''){
+  return `<div class="field"><label>${label}</label><input type="date" value="${esc(val||'')}" ${disabled} onchange="upd(${ci},'${key}',this.value)"></div>`;
 }
 
 function updateStats(){
@@ -427,7 +566,7 @@ function updateStats(){
       mice++;
       if(x.alive){ alive++; x.sex==='Female'?f++:(x.sex==='Male'?m++:0); }
       if(isWeanReady(x)) weanReady++;
-      if(x.genoStatus==='Pending') pending++;
+      if(x.sampleStatus==='Pending') pending++;
     });
   });
   document.getElementById('stats').innerHTML =
@@ -437,34 +576,54 @@ function updateStats(){
      <div class="stat"><b style="color:var(--female)">${f}</b><span>Female</span></div>
      <div class="stat"><b style="color:var(--male)">${m}</b><span>Male</span></div>
      <div class="stat clickable" onclick="setWeanFilterOn()"><b style="color:var(--warn)">${weanReady}</b><span>Wean-ready</span></div>
-     <div class="stat clickable" onclick="setGenoFilterPending()"><b style="color:var(--pending)">${pending}</b><span>Pending</span></div>
+     <div class="stat clickable" onclick="setSampleFilterPending()"><b style="color:var(--pending)">${pending}</b><span>Pending</span></div>
      <div class="stat"><b>${litters}</b><span>Litters</span></div>`;
 }
 function setWeanFilterOn(){ if(!filterWean) toggleWean(); }
 function setActiveFilterOn(){ if(!filterActive) toggleActive(); }
-function setGenoFilterPending(){ document.getElementById('fGeno').value='Pending'; render(); }
+function setSampleFilterPending(){ document.getElementById('fSample').value='Pending'; render(); }
 
-/* ---------- Edit handlers ---------- */
-function upd(ci,key,val){ colony[ci][key]=val; save(); }
-function updM(ci,mi,key,val){ colony[ci].mice[mi][key]=val; save(); }
-function updE(ci,ei,key,val){ colony[ci].events[ei][key]=val; save(); }
+/* ---------- Edit handlers (all respect the lock) ---------- */
+function upd(ci,key,val){ if(locked(colony[ci]))return; colony[ci][key]=val; save(); }
+function updM(ci,mi,key,val){ if(locked(colony[ci])||locked(colony[ci].mice[mi]))return; colony[ci].mice[mi][key]=val; save(); }
+function updE(ci,ei,key,val){ const e=colony[ci].events[ei]; if(locked(colony[ci])||e.locked)return; e[key]=val; save(); }
+
+/* Alive ↔ disposition rule */
+function setAlive(ci,mi,checked){
+  const m = colony[ci].mice[mi];
+  if(locked(colony[ci])||locked(m)){ render(); return; }
+  if(checked===false){
+    if(!(m.disposition.trim() && m.dispositionDate)){
+      alert('To mark a mouse as not alive, fill in both Disposition and a Disposition Date first.');
+      render(); return;
+    }
+  }
+  m.alive = checked;
+  render();
+}
+
 function addCage(){ colony.push(blankCage()); render(); }
-function delCage(ci){ if(confirm('Delete cage "'+colony[ci].cage+'" and all its mice?')){ colony.splice(ci,1); render(); } }
-function toggleCageActive(ci){ colony[ci].active=!colony[ci].active; render(); }
-function addMouse(ci){ const mo=blankMouse(); mo.mouseId=nextMouseId(); mo.earPunch=mo.mouseId; colony[ci].mice.push(mo); render(); }
-function delMouse(ci,mi){ colony[ci].mice.splice(mi,1); render(); }
-function addEvent(ci){ colony[ci].events.push(blankEvent()); render(); }
-function delEvent(ci,ei){ colony[ci].events.splice(ei,1); render(); }
-function clearAll(){ if(confirm('Clear everything? Export first if needed.')){ colony=[]; render(); } }
+function delCage(ci){ if(locked(colony[ci]))return; if(confirm('Delete cage "'+colony[ci].cage+'" and all its mice?')){ colony.splice(ci,1); render(); } }
+function toggleCageActive(ci){ if(locked(colony[ci]))return; colony[ci].active=!colony[ci].active; render(); }
+function addMouse(ci){ if(locked(colony[ci]))return; const mo=blankMouse(); mo.mouseId=nextMouseId(); mo.earPunch=mo.mouseId; colony[ci].mice.push(mo); render(); }
+function delMouse(ci,mi){ if(locked(colony[ci])||locked(colony[ci].mice[mi]))return; colony[ci].mice.splice(mi,1); render(); }
+function addEvent(ci){ if(locked(colony[ci]))return; colony[ci].events.push(blankEvent()); render(); }
+function delEvent(ci,ei){ const e=colony[ci].events[ei]; if(locked(colony[ci])||e.locked)return; colony[ci].events.splice(ei,1); render(); }
+function toggleEventLock(ci,ei){ if(locked(colony[ci]))return; const e=colony[ci].events[ei]; e.locked=!e.locked; render(); }
+function clearAll(){ if(confirm('Clear everything? Export first if needed.')){ colony=[]; editUnlocked=true; render(); } }
 
 /* ---------- Search matching ---------- */
-function cageMatches(c,q){ return [c.cage,c.pairing,c.datePaired,c.litterNote].join(' ').toLowerCase().includes(q); }
+function cageMatches(c,q){
+  return [c.cage,c.femaleLineage,c.maleLineage,c.datePaired,c.litterNote].join(' ').toLowerCase().includes(q);
+}
+function mouseHaystack(m){
+  return [m.mouseId,m.earPunch,m.sex,m.sampleStatus,m.disposition,m.notes,m.dob].join(' ').toLowerCase();
+}
 
 /* ---------- Helpers ---------- */
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 /* ---------- Date normalization for import ---------- */
-// Accepts dd-mm-yyyy, dd/mm/yyyy, yyyy-mm-dd → returns ISO yyyy-mm-dd or '' if unparseable
 function toISO(s){
   if(!s) return '';
   s = String(s).trim();
@@ -476,7 +635,7 @@ function toISO(s){
     if(y.length===2) y='20'+y;
     return `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
   }
-  return ''; // leave non-date text out of date fields
+  return '';
 }
 
 /* ---------- JSON ---------- */
@@ -486,25 +645,28 @@ function importJSON(input){
   const r=new FileReader();
   r.onload=e=>{ try{ const d=JSON.parse(e.target.result);
       if(!Array.isArray(d)) throw 0;
-      colony=d.map(normCage); render();
+      colony=d.map(normCage);
+      markAllOld();              // imported data = old → locked if a master code exists
+      editUnlocked=false;
+      render();
     }catch{ alert('Invalid JSON file.'); } };
   r.readAsText(file); input.value='';
 }
 
-/* ---------- CSV (flat: one row per mouse, cage fields repeated) ---------- */
-const CSV_HEADERS = ['CAGE','Pairing','Date Paired','Active','Litter/Weaned',
-  'DOB','Mouse ID','Ear Punch','Sex','Weaning Date','Genotype','Geno Status','Disposition','Alive','Notes'];
+/* ---------- CSV ---------- */
+const CSV_HEADERS = ['CAGE','Female Lineage','Female DOB','Male Lineage','Male DOB','Date Paired','Active','Litter/Weaned',
+  'DOB','Mouse ID','Ear Punch','Sex','Weaning Date','Sample Status','Disposition','Disposition Date','Alive','Notes'];
 
 function exportCSV(){
   const rows=[CSV_HEADERS];
   colony.forEach(c=>{
-    const meta=[c.cage,c.pairing,c.datePaired,c.active?'Active':'Inactive',c.litterNote];
+    const meta=[c.cage,c.femaleLineage,c.femaleDob,c.maleLineage,c.maleDob,c.datePaired,c.active?'Active':'Inactive',c.litterNote];
     if(!c.mice.length){
       rows.push([...meta,'','','','','','','','','','']);
     }
     c.mice.forEach(m=>{
       rows.push([...meta, m.dob,m.mouseId,m.earPunch,m.sex,m.weaningDate,
-        m.genotype,m.genoStatus,m.disposition, m.alive?'Yes':'No', m.notes]);
+        m.sampleStatus,m.disposition,m.dispositionDate, m.alive?'Yes':'No', m.notes]);
     });
   });
   const csv=rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
@@ -515,7 +677,8 @@ function csvCell(v){ v=String(v==null?'':v); return /[",\r\n]/.test(v)?'"'+v.rep
 function importCSV(input){
   const file=input.files[0]; if(!file) return;
   const r=new FileReader();
-  r.onload=e=>{ try{ parseCSVtoColony(e.target.result); render(); }
+  r.onload=e=>{ try{ parseCSVtoColony(e.target.result);
+      markAllOld(); editUnlocked=false; render(); }
     catch(err){ alert('Could not parse CSV: '+err); } };
   r.readAsText(file); input.value='';
 }
@@ -525,14 +688,26 @@ function parseCSVtoColony(text){
   const head=rows[0].map(h=>h.trim().toLowerCase());
   function find(opts){ for(const o of opts){ const i=head.findIndex(h=>h.startsWith(o)); if(i>=0)return i;} return -1; }
   const idx={
-    cage:find(['cage']), pairing:find(['pairing','(female + male)','female + male']),
+    cage:find(['cage']),
+    femaleLineage:find(['female lineage','female line']),
+    femaleDob:find(['female dob']),
+    maleLineage:find(['male lineage','male line']),
+    maleDob:find(['male dob']),
     datePaired:find(['date paired']), active:find(['active']),
     litter:find(['litter/weaned','no. of litter','litter','weaned']),
     dob:find(['dob']), mouseId:find(['mouse id']), earPunch:find(['ear punch']),
-    sex:find(['sex']), weaning:find(['weaning date']), genotype:find(['genotype']),
-    genoStatus:find(['geno status']), disposition:find(['disposition']),
+    sex:find(['sex']), weaning:find(['weaning date']),
+    sampleStatus:find(['sample status','sample']),
+    disposition:find(['disposition date']>=0?['disposition']:['disposition']),
+    dispositionDate:find(['disposition date']),
     alive:find(['alive']), notes:find(['notes'])
   };
+  // disambiguate disposition vs disposition date (both start with "disposition")
+  idx.disposition = (function(){
+    const i = head.findIndex(h=>h.startsWith('disposition') && !h.startsWith('disposition date'));
+    return i>=0 ? i : find(['disposition']);
+  })();
+
   const get=(row,i)=> i>=0&&i<row.length? row[i].trim():'';
 
   const map={}; const order=[];
@@ -542,13 +717,16 @@ function parseCSVtoColony(text){
     const cageName=get(row,idx.cage);
     let key = cageName || (order.length?order[order.length-1]:'');
     if(cageName && !map[cageName]){
-      map[cageName]={cage:cageName,pairing:get(row,idx.pairing),datePaired:toISO(get(row,idx.datePaired)),
+      map[cageName]={cage:cageName,
+        femaleLineage:get(row,idx.femaleLineage), femaleDob:toISO(get(row,idx.femaleDob)),
+        maleLineage:get(row,idx.maleLineage), maleDob:toISO(get(row,idx.maleDob)),
+        datePaired:toISO(get(row,idx.datePaired)),
         active: /inactive|no|false/i.test(get(row,idx.active))?false:true,
         litterNote:get(row,idx.litter),events:[],mice:[]};
       order.push(cageName); key=cageName;
     }
     if(!key){
-      key='Unassigned'; if(!map[key]){map[key]={cage:key,pairing:'',datePaired:'',active:true,litterNote:'',events:[],mice:[]};order.push(key);}
+      key='Unassigned'; if(!map[key]){map[key]={cage:key,femaleLineage:'',femaleDob:'',maleLineage:'',maleDob:'',datePaired:'',active:true,litterNote:'',events:[],mice:[]};order.push(key);}
     }
     if(cageName && map[cageName] && get(row,idx.litter)){
       map[cageName].litterNote=map[cageName].litterNote||get(row,idx.litter);
@@ -560,8 +738,10 @@ function parseCSVtoColony(text){
     if(hasMouse){
       map[key].mice.push({
         dob:toISO(get(row,idx.dob)), mouseId:get(row,idx.mouseId), earPunch:get(row,idx.earPunch),
-        sex, weaningDate:toISO(get(row,idx.weaning)), genotype:get(row,idx.genotype),
-        genoStatus:get(row,idx.genoStatus), disposition:get(row,idx.disposition),
+        sex, weaningDate:toISO(get(row,idx.weaning)),
+        sampleStatus:get(row,idx.sampleStatus),
+        disposition:get(row,idx.disposition),
+        dispositionDate:toISO(get(row,idx.dispositionDate)),
         alive: aliveRaw? /yes|true|alive|1/i.test(aliveRaw):true,
         notes:get(row,idx.notes)
       });
@@ -569,7 +749,6 @@ function parseCSVtoColony(text){
   }
   colony=order.map(k=>map[k]).map(normCage);
 }
-// RFC-4180-ish CSV parser
 function parseCSV(text){
   const rows=[]; let row=[],cell='',q=false;
   text=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
@@ -596,7 +775,11 @@ function download(name, content, type){
 }
 
 /* ---------- init ---------- */
-if(!load()){ colony=[]; }
+if(!load()){ colony=[]; editUnlocked=true; }
+else {
+  // data restored from storage. If a master code exists, treat restored data as locked.
+  if(hasMasterCode()) editUnlocked=false; else editUnlocked=true;
+}
 render();
 </script>
 </body>

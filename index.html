@@ -57,7 +57,7 @@
     border-radius: 7px; padding: 7px 11px; min-width: 220px;
   }
   .colony-name:focus { outline: none; border-color: var(--accent); }
-  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; align-items:center; }
   button, .filebtn {
     border: 1px solid var(--line);
     background: var(--panel);
@@ -81,6 +81,18 @@
     opacity: .55; cursor: not-allowed;
   }
   input[type=file] { display: none; }
+
+  /* Small paste-JSON box in the toolbar */
+  .paste-json {
+    width: 150px;
+    padding: 6px 9px;
+    border: 1px dashed var(--line);
+    border-radius: 7px;
+    font-size: 12px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  .paste-json:focus { outline: none; border-color: var(--accent); border-style: solid; }
+
   .stats {
     display: flex;
     gap: 10px;
@@ -227,12 +239,15 @@
 </head>
 <body>
 <header>
-  <h1>🐭 Mouse Colony Manager <span class="version-badge">v2.5</span></h1>
+  <h1>🐭 Mouse Colony Manager <span class="version-badge">v2.6</span></h1>
   <div class="toolbar">
     <button class="primary" onclick="addCage()">＋ Mating</button>
     <label class="filebtn">⬆ Import JSON<input type="file" accept=".json" onchange="importJSON(this)"></label>
+    <!-- <input class="paste-json" id="pasteJson" type="text" placeholder="paste JSON…" onkeydown="if(event.key==='Enter')importPasted()">
+    <button class="tiny" onclick="importPasted()">Load paste</button> -->
     <button onclick="exportCSV()">⬇ Export CSV</button>
     <button onclick="exportJSON()">⬇ Export JSON</button>
+    <button onclick="copyJSON(this)">📋 Copy JSON</button>
     <button class="danger" onclick="clearAll()">Clear</button>
   </div>
   <div class="stats" id="stats"></div>
@@ -266,11 +281,11 @@
   <div id="content"></div>
 </main>
 
-<footer>v2.1 — Auto-saved to this browser. Export to JSON for a complete backup (all details), or CSV for a quick-view snapshot. — Built for offline, cross-platform use.</footer>
+<footer>v2.2 — Auto-saved to this browser. Export to JSON for a complete backup (all details), or CSV for a quick-view snapshot. — Built for offline, cross-platform use.</footer>
 
 <script>
 /* ---------- Constants ---------- */
-const APP_VERSION = '2.1';
+const APP_VERSION = '2.2';
 const WEAN_AGE_DAYS = 21;
 const SEXES = ['Female','Male','Unknown'];
 const SAMPLE_STATUS = ['','Sample collected','Pending','Confirmed','Not confirmed'];
@@ -449,21 +464,6 @@ function isWeanReady(m){
   return m.alive && days!==null && days>=WEAN_AGE_DAYS && !m.weaningDate;
 }
 
-/* ---------- Auto-increment ID (never repeats) ----------
-   Finds the highest purely-numeric ID, then increments past any taken ID.
-*/
-function nextMouseId(){
-  let max = 0;
-  colony.forEach(c=>c.mice.forEach(m=>{
-    const n = parseInt(m.mouseId,10);
-    if(!isNaN(n) && String(n) === String(m.mouseId).trim() && n>max) max=n;
-  }));
-  const taken = allMouseIds(null);
-  let candidate = max + 1;
-  while(taken.has(String(candidate).toLowerCase())) candidate++;
-  return String(candidate);
-}
-
 /* ---------- Filters ---------- */
 function toggleWean(){ filterWean=!filterWean; document.getElementById('fWean').classList.toggle('active',filterWean); render(); }
 function toggleActive(){ filterActive=!filterActive; document.getElementById('fActive').classList.toggle('active',filterActive); render(); }
@@ -577,14 +577,15 @@ function render() {
       const canKill = m.disposition.trim() && m.dispositionDate;
       const aliveDisabled = mDis || (m.alive && !canKill);
       const tr = document.createElement('tr');
+      tr.dataset.ci = ci; tr.dataset.mi = mi;
       tr.innerHTML = `
         <td class="id-col"><input value="${esc(m.mouseId)}" ${mDis} placeholder="alphanumeric" onchange="updMouseId(${ci},${mi},this)"></td>
-        <td><input type="date" value="${esc(m.dob)}" ${mDis} onchange="updM(${ci},${mi},'dob',this.value);render()"></td>
+        <td><input type="date" value="${esc(m.dob)}" ${mDis} onchange="updDob(${ci},${mi},this.value)"></td>
         <td class="age-cell ${weanReady?'wean-ready':''}">${ageLabel(m.dob)}${weanReady?'<span class="wean-tag">WEAN</span>':''}</td>
         <td><input value="${esc(m.earPunch)}" ${mDis} inputmode="numeric" placeholder="numeric" onchange="updEarPunch(${ci},${mi},this)"></td>
         <td><select class="sex-${esc(m.sex)}" ${mDis} onchange="updM(${ci},${mi},'sex',this.value);render()">
             ${SEXES.map(s=>`<option ${m.sex===s?'selected':''}>${s}</option>`).join('')}</select></td>
-        <td><input type="date" value="${esc(m.weaningDate)}" ${mDis} onchange="updM(${ci},${mi},'weaningDate',this.value);render()"></td>
+        <td><input type="date" value="${esc(m.weaningDate)}" ${mDis} onchange="updWeaning(${ci},${mi},this.value)"></td>
         <td><select class="samp-${esc(m.sampleStatus)}" ${mDis} onchange="updM(${ci},${mi},'sampleStatus',this.value);render()">
             ${SAMPLE_STATUS.map(s=>`<option value="${s}" ${m.sampleStatus===s?'selected':''}>${s||'—'}</option>`).join('')}</select></td>
         <td><input value="${esc(m.disposition)}" ${mDis} placeholder="e.g. culled / transferred" onchange="updM(${ci},${mi},'disposition',this.value);render()"></td>
@@ -613,7 +614,7 @@ function render() {
         <select class="e-type" ${eDis} onchange="updE(${ci},${ei},'type',this.value)">
           ${typeOpts.map(t=>`<option ${ev.type===t?'selected':''}>${esc(t)}</option>`).join('')}
         </select>
-        <input class="e-date" type="date" value="${esc(ev.date)}" ${eDis} onchange="updE(${ci},${ei},'date',this.value);render()">
+        <input class="e-date" type="date" value="${esc(ev.date)}" ${eDis} onchange="updE(${ci},${ei},'date',this.value)">
         <input class="e-detail" placeholder="detail (e.g. re-paired with S4)" value="${esc(ev.detail)}" ${eDis} onchange="updE(${ci},${ei},'detail',this.value)">
         <button class="row-del" title="${ev.locked?'Locked — cannot delete':'delete'}" ${ev.locked || locked(cage) ?'disabled':''} onclick="delEvent(${ci},${ei})">×</button>
       </div>`;
@@ -738,6 +739,40 @@ function upd(ci,key,val){ if(locked(colony[ci]))return; colony[ci][key]=val; sav
 function updM(ci,mi,key,val){ if(locked(colony[ci])||locked(colony[ci].mice[mi]))return; colony[ci].mice[mi][key]=val; save(); }
 function updE(ci,ei,key,val){ const e=colony[ci].events[ei]; if(locked(colony[ci])||e.locked)return; e[key]=val; save(); }
 
+/* ---------- Date updates WITHOUT a full re-render ----------
+   The previous version called render() inside the date input's onchange,
+   which rebuilt the input mid-edit and scrambled keyboard-typed years.
+   These handlers update state + persist, then refresh only the small
+   derived bits (age cell, wean tag, stats) for the affected row.
+*/
+function refreshRowAge(ci, mi){
+  const m = colony[ci].mice[mi];
+  // Find the matching row in the DOM and update just its age cell.
+  document.querySelectorAll('tr[data-ci][data-mi]').forEach(tr=>{
+    if(Number(tr.dataset.ci)===ci && Number(tr.dataset.mi)===mi){
+      const ageCell = tr.querySelector('.age-cell');
+      if(ageCell){
+        const weanReady = isWeanReady(m);
+        ageCell.className = 'age-cell' + (weanReady?' wean-ready':'');
+        ageCell.innerHTML = ageLabel(m.dob) + (weanReady?'<span class="wean-tag">WEAN</span>':'');
+      }
+    }
+  });
+  updateStats();
+}
+function updDob(ci,mi,val){
+  if(locked(colony[ci])||locked(colony[ci].mice[mi]))return;
+  colony[ci].mice[mi].dob = val;
+  save();
+  refreshRowAge(ci, mi);
+}
+function updWeaning(ci,mi,val){
+  if(locked(colony[ci])||locked(colony[ci].mice[mi]))return;
+  colony[ci].mice[mi].weaningDate = val;
+  save();
+  refreshRowAge(ci, mi);   // weaning affects wean-ready status
+}
+
 /* Mouse ID edit — alphanumeric, must be unique */
 function updMouseId(ci,mi,input){
   const m = colony[ci].mice[mi];
@@ -812,6 +847,19 @@ function delEvent(ci,ei){ const e=colony[ci].events[ei]; if(locked(colony[ci])||
 function toggleEventLock(ci,ei){ if(locked(colony[ci]))return; const e=colony[ci].events[ei]; e.locked=!e.locked; render(); }
 function clearAll(){ if(confirm('Clear everything? Export first if needed.')){ colony=[]; colonyName=''; const cn=document.getElementById('colonyName'); if(cn) cn.value=''; editUnlocked=true; render(); } }
 
+/* ---------- Auto-increment ID (never repeats) ---------- */
+function nextMouseId(){
+  let max = 0;
+  colony.forEach(c=>c.mice.forEach(m=>{
+    const n = parseInt(m.mouseId,10);
+    if(!isNaN(n) && String(n) === String(m.mouseId).trim() && n>max) max=n;
+  }));
+  const taken = allMouseIds(null);
+  let candidate = max + 1;
+  while(taken.has(String(candidate).toLowerCase())) candidate++;
+  return String(candidate);
+}
+
 /* ---------- Search matching ---------- */
 function cageMatches(c,q){
   return [c.cage,c.femaleId,c.maleId,c.femaleLineage,c.maleLineage,c.femaleLineageParent,c.maleLineageParent,c.datePaired].join(' ').toLowerCase().includes(q);
@@ -824,42 +872,79 @@ function mouseHaystack(m){
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 /* ---------- JSON (full-fidelity store) ---------- */
-function exportJSON(){
-  download('mouse_colony.json', JSON.stringify({version:APP_VERSION, colonyName, matings:colony},null,2), 'application/json');
+function buildJSON(){
+  return JSON.stringify({version:APP_VERSION, colonyName, matings:colony}, null, 2);
 }
+function exportJSON(){
+  download('mouse_colony.json', buildJSON(), 'application/json');
+}
+
+/* Copy the full JSON export to the clipboard */
+function copyJSON(btn){
+  const text = buildJSON();
+  const done = ()=>{
+    const old = btn.textContent;
+    btn.textContent = '✓ Copied';
+    setTimeout(()=>{ btn.textContent = old; }, 1400);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+function fallbackCopy(text, done){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try{ document.execCommand('copy'); done(); }
+  catch(e){ alert('Copy failed — please use Export JSON instead.'); }
+  document.body.removeChild(ta);
+}
+
+/* Shared loader for both file import and pasted text */
+function loadParsed(parsed){
+  let d;
+  if(Array.isArray(parsed)){ d = parsed; }                       // legacy format
+  else if(parsed && Array.isArray(parsed.matings)){ d = parsed.matings; colonyName = parsed.colonyName||colonyName; }
+  else throw new Error('bad shape');
+  colony = d.map(normCage);
+  markAllOld();
+  editUnlocked = false;
+  render();
+}
+
 function importJSON(input){
   const file=input.files[0]; if(!file) return;
   const r=new FileReader();
-  r.onload=e=>{ try{ const parsed=JSON.parse(e.target.result);
-      let d;
-      if(Array.isArray(parsed)){ d=parsed; }                 // legacy format
-      else if(parsed && Array.isArray(parsed.matings)){ d=parsed.matings; colonyName=parsed.colonyName||colonyName; }
-      else throw 0;
-      colony=d.map(normCage);
-      markAllOld();
-      editUnlocked=false;
-      render();
-    }catch{ alert('Invalid JSON file.'); } };
+  r.onload=e=>{ try{ loadParsed(JSON.parse(e.target.result)); }
+    catch{ alert('Invalid JSON file.'); } };
   r.readAsText(file); input.value='';
 }
 
-/* ---------- CSV (export only — quick-view snapshot) ----------
-   Column layout matches the visualization sheet:
-   Colony/Strain, MATING, Female Parent ID, Female Parent Dob,
-   Male Parent ID, Male Parent DOB, Mouse ID, Ear Punch, Sex, DOB,
-   Weaning Date, Disposition, Disposition Date, Notes
-*/
+/* Import JSON pasted into the small text box */
+function importPasted(){
+  const box = document.getElementById('pasteJson');
+  const txt = (box.value||'').trim();
+  if(!txt){ alert('Paste JSON into the box first.'); return; }
+  let parsed;
+  try{ parsed = JSON.parse(txt); }
+  catch{ alert('Invalid JSON — could not parse the pasted text.'); return; }
+  try{
+    if(colony.length && !confirm('This will replace all current data. Continue?')) return;
+    loadParsed(parsed);
+    box.value = '';
+  }catch{ alert('JSON parsed, but it is not a valid colony export.'); }
+}
+
+/* ---------- CSV (export only — quick-view snapshot) ---------- */
 const CSV_HEADERS = ['Colony/Strain','MATING','Female Parent ID','Female Parent Dob',
   'Male Parent ID','Male Parent DOB','Mouse ID','Ear Punch','Sex','DOB',
   'Weaning Date','Genotyping Status','Disposition','Disposition Date','Notes'];
 
-
-
-/* Build "Lineage LineageMode ParentID" for a parent.
-   - If the parent ID matches a live mouse, use that mouse's derived
-     lineage and its ID (mode is implicitly "existing").
-   - Otherwise use the manually entered lineage, mode, and either the
-     entered Mouse # or the "Progeny of" parent reference. */
 function parentLabel(which, c){
   const isF = which === 'female';
   const id     = (isF ? c.femaleId     : c.maleId)     || '';
@@ -872,16 +957,12 @@ function parentLabel(which, c){
 
   const lineage = (isF ? c.femaleLineage     : c.maleLineage)     || '';
   const mode    = (isF ? c.femaleLineageMode : c.maleLineageMode) || '';
-  // For "Progeny of" the meaningful reference is the parent mating/line;
-  // otherwise fall back to the entered Mouse # (founder line).
   const ref = mode === 'Progeny of'
     ? ((isF ? c.femaleLineageParent : c.maleLineageParent) || '')
     : id;
 
   return [lineage, mode, ref].filter(Boolean).join(' ').trim();
 }
-
-
 
 function exportCSV(){
   const rows = [CSV_HEADERS];
@@ -895,7 +976,6 @@ function exportCSV(){
     ];
 
     if(!c.mice.length){
-      // Fill the remaining 9 mouse columns with blanks.
       rows.push([...meta, '', '', '', '', '', '', '', '', '']);
       return;
     }
@@ -911,9 +991,6 @@ function exportCSV(){
   const csv = rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
   download('mouse_colony.csv', csv, 'text/csv');
 }
-
-
-
 
 function csvCell(v){ v=String(v==null?'':v); return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
 

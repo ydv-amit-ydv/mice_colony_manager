@@ -1,0 +1,4224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Colony Management System</title>
+    <style>
+        :root {
+            --male-color: #4a90d9;
+            --female-color: #e91e8c;
+            --dead-color: #888;
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-card: #1f2940;
+            --text-primary: #e8e8e8;
+            --text-secondary: #a0a0a0;
+            --border-color: #2d3a4f;
+            --accent: #4ecca3;
+            --error: #ff6b6b;
+            --warning: #ffd93d;
+        }
+
+        body.theme-light {
+            --bg-primary: #f0f4f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #e8edf3;
+            --text-primary: #1a1a2e;
+            --text-secondary: #556070;
+            --border-color: #ccd6e0;
+            --accent: #1a9e7a;
+            --error: #d93025;
+            --warning: #e08c00;
+            --dead-color: #666;
+        }
+
+        /* Collapsible sidebar sections */
+        .sidebar-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            padding: 4px 0;
+            user-select: none;
+        }
+
+        .sidebar-section-header:hover h3 {
+            color: var(--accent);
+        }
+
+        .sidebar-section-header h3 {
+            margin-bottom: 0;
+            transition: color 0.2s;
+        }
+
+        .collapse-arrow {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            transition: transform 0.25s;
+        }
+
+        .sidebar-section-header.collapsed .collapse-arrow {
+            transform: rotate(-90deg);
+        }
+
+        .sidebar-collapsible {
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.3s ease;
+            max-height: 2000px;
+            opacity: 1;
+        }
+
+        .sidebar-collapsible.collapsed {
+            max-height: 0;
+            opacity: 0;
+        }
+
+        /* Sidebar list items (matings, litters, events) */
+        .sidebar-record-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .sidebar-record-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+            font-size: 0.85rem;
+        }
+
+        .sidebar-record-item:hover {
+            border-color: var(--accent);
+        }
+
+        .sidebar-record-item.selected {
+            border-color: var(--accent);
+            background: rgba(78, 204, 163, 0.1);
+        }
+
+        .record-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.95rem;
+            flex-shrink: 0;
+        }
+
+        .record-icon.mating-icon { background: rgba(78,204,163,0.15); }
+        .record-icon.litter-icon { background: rgba(255,217,61,0.15); }
+        .record-icon.event-icon  { background: rgba(100,149,237,0.15); }
+
+        .record-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .record-info .rid {
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .record-info .rmeta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Theme toggle button */
+        .theme-toggle {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* Layout */
+        .app-container {
+            display: grid;
+            grid-template-columns: 280px 1fr 320px;
+            grid-template-rows: 60px 1fr;
+            height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            grid-column: 1 / -1;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+
+        .header h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            margin-bottom: 20px;
+        }
+
+        .sidebar-section h3 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .btn-primary:hover {
+            background: #3db892;
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .btn-danger {
+            background: var(--error);
+            color: white;
+        }
+
+        .btn-full {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.8rem;
+        }
+
+        /* Main Content */
+        .main-content {
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Timeline Canvas */
+        .timeline-container {
+            flex: 1;
+            overflow: auto;
+            background: var(--bg-primary);
+            position: relative;
+        }
+
+        .timeline-canvas {
+            min-width: 100%;
+            min-height: 100%;
+        }
+
+        /* Detail Panel */
+        .detail-panel {
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .detail-panel h2 {
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* Animal List */
+        .animal-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .animal-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .animal-item:hover {
+            border-color: var(--accent);
+        }
+
+        .animal-item.selected {
+            border-color: var(--accent);
+            background: rgba(78, 204, 163, 0.1);
+        }
+
+        .animal-item.dimmed {
+            opacity: 0.3;
+        }
+
+        .animal-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .animal-icon.male {
+            background: rgba(74, 144, 217, 0.2);
+            color: var(--male-color);
+        }
+
+        .animal-icon.female {
+            background: rgba(233, 30, 140, 0.2);
+            color: var(--female-color);
+        }
+
+        .animal-icon.dead {
+            background: rgba(136, 136, 136, 0.2);
+            color: var(--dead-color);
+        }
+
+        .animal-info {
+            flex: 1;
+        }
+
+        .animal-info .id {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .animal-info .meta {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .animal-age {
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 12px;
+            background: var(--bg-primary);
+        }
+
+        /* Age-based gradient colors */
+        .age-young { background: #2ecc71; color: white; }
+        .age-adult { background: #3498db; color: white; }
+        .age-mature { background: #9b59b6; color: white; }
+        .age-old { background: #e67e22; color: white; }
+        .age-senior { background: #e74c3c; color: white; }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .form-group .error {
+            border-color: var(--error);
+        }
+
+        .form-error {
+            color: var(--error);
+            font-size: 0.8rem;
+            margin-top: 4px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: scale(0.9);
+            transition: transform 0.3s;
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            font-size: 1.2rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.5rem;
+            line-height: 1;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+
+        .tab:hover {
+            color: var(--accent);
+        }
+
+        .tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Detail View */
+        .detail-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .detail-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+        }
+
+        .detail-title h2 {
+            margin-bottom: 5px;
+            border: none;
+            padding: 0;
+        }
+
+        .detail-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .stat-card .label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .stat-card .value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        .detail-section {
+            margin-bottom: 20px;
+        }
+
+        .detail-section h4 {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .relation-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .relation-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            background: var(--bg-card);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .relation-item:hover {
+            background: var(--border-color);
+        }
+
+        .relation-badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: var(--bg-primary);
+        }
+
+        /* Timeline SVG */
+        .timeline-svg {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        .timeline-line {
+            stroke-width: 4;
+            stroke-linecap: round;
+        }
+
+        .timeline-line.male {
+            stroke: var(--male-color);
+        }
+
+        .timeline-line.female {
+            stroke: var(--female-color);
+        }
+
+        .timeline-line.dead {
+            stroke: var(--dead-color);
+        }
+
+        .timeline-line.dimmed {
+            opacity: 0.15;
+        }
+
+        .timeline-line.highlighted {
+            stroke-width: 6;
+            filter: drop-shadow(0 0 6px currentColor);
+        }
+
+        .mating-connector {
+            stroke: var(--accent);
+            stroke-width: 2;
+            stroke-dasharray: 5, 3;
+            fill: none;
+        }
+
+        .mating-connector.dimmed {
+            opacity: 0.15;
+        }
+
+        .litter-line {
+            stroke: #ffd93d;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .litter-line.dimmed {
+            opacity: 0.15;
+        }
+
+        .event-marker {
+            cursor: pointer;
+        }
+
+        .event-marker circle.event-dot {
+            transition: r 0.15s ease, filter 0.15s ease;
+        }
+
+        .event-marker:hover circle.event-dot {
+            filter: brightness(1.4);
+        }
+
+        .event-marker circle.event-hit {
+            fill: transparent;
+            stroke: none;
+        }
+
+        .animal-node {
+            cursor: pointer;
+        }
+
+        .animal-node:hover .node-circle {
+            stroke-width: 3;
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            padding: 10px 20px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .stats-bar .stat {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+        }
+
+        .stats-bar .stat-value {
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            padding: 12px 20px;
+            border-radius: 8px;
+            background: var(--bg-card);
+            border-left: 4px solid var(--accent);
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.error {
+            border-color: var(--error);
+        }
+
+        .toast.warning {
+            border-color: var(--warning);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Checkbox Group */
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-height: 150px;
+            overflow-y: auto;
+            padding: 10px;
+            background: var(--bg-card);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .checkbox-item:hover {
+            background: var(--border-color);
+        }
+
+        .checkbox-item input {
+            width: auto;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            padding: 10px 15px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .toolbar-group {
+            display: flex;
+            gap: 5px;
+        }
+
+        /* Search */
+        .search-box {
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 10px 10px 35px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+
+        .search-box::before {
+            content: "🔍";
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.9rem;
+        }
+
+        /* Filter Tags */
+        .filter-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 15px;
+        }
+
+        .filter-tag {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
+        }
+
+        .filter-tag:hover,
+        .filter-tag.active {
+            background: var(--accent);
+            color: var(--bg-primary);
+            border-color: var(--accent);
+        }
+
+        /* Pup name list */
+        .pup-name-input:focus {
+            outline: none;
+            border-color: var(--accent) !important;
+        }
+        .pup-sex-select:focus {
+            outline: none;
+            border-color: var(--accent) !important;
+        }
+
+        /* Hidden file input */
+        .hidden-input {
+            display: none;
+        }
+
+        /* Confirm Dialog */
+        .confirm-dialog {
+            text-align: center;
+        }
+
+        .confirm-dialog .icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .confirm-dialog p {
+            margin-bottom: 20px;
+            color: var(--text-secondary);
+        }
+
+        .confirm-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🐭 Colony Management System</h1>
+            <div class="header-actions">
+                <button class="theme-toggle" onclick="toggleTheme()" id="themeToggleBtn">☀️ Light Theme</button>
+                <button class="btn btn-secondary" onclick="exportXML()">📤 Export XML</button>
+                <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">📥 Import XML</button>
+                <input type="file" id="importFile" class="hidden-input" accept=".xml" onchange="importXML(event)">
+            </div>
+        </header>
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <h3>Quick Actions</h3>
+                <button class="btn btn-primary btn-full" onclick="openModal('addAnimal')">➕ Add Animal</button>
+                <button class="btn btn-secondary btn-full" style="margin-top:8px" onclick="openModal('addMating')">🔗 New Mating</button>
+                <button class="btn btn-secondary btn-full" style="margin-top:8px" onclick="openModal('addLitter')">🐣 Record Litter</button>
+                <button class="btn btn-secondary btn-full" style="margin-top:8px" onclick="openModal('addEvent')">📅 Add Event</button>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Filters</h3>
+                <div class="filter-tags">
+                    <span class="filter-tag active" data-filter="all" onclick="setFilter('all')">All</span>
+                    <span class="filter-tag" data-filter="active" onclick="setFilter('active')">Active</span>
+                    <span class="filter-tag" data-filter="male" onclick="setFilter('male')">♂ Males</span>
+                    <span class="filter-tag" data-filter="female" onclick="setFilter('female')">♀ Females</span>
+                    <span class="filter-tag" data-filter="dead" onclick="setFilter('dead')">Dead</span>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-section-header" onclick="toggleSidebarSection('animalsSection', this)">
+                    <h3>Animals</h3>
+                    <span class="collapse-arrow">▼</span>
+                </div>
+                <div class="sidebar-collapsible" id="animalsSection">
+                    <div class="search-box" style="margin-top:10px">
+                        <input type="text" placeholder="Search animals..." oninput="searchAnimals(this.value)">
+                    </div>
+                    <div class="animal-list" id="animalList"></div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-section-header" onclick="toggleSidebarSection('matingsSection', this)">
+                    <h3>Matings</h3>
+                    <span class="collapse-arrow">▼</span>
+                </div>
+                <div class="sidebar-collapsible" id="matingsSection">
+                    <div class="search-box" style="margin-top:10px">
+                        <input type="text" placeholder="Search matings..." oninput="searchMatings(this.value)">
+                    </div>
+                    <div class="sidebar-record-list" id="matingList"></div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-section-header" onclick="toggleSidebarSection('littersSection', this)">
+                    <h3>Litters</h3>
+                    <span class="collapse-arrow">▼</span>
+                </div>
+                <div class="sidebar-collapsible" id="littersSection">
+                    <div class="search-box" style="margin-top:10px">
+                        <input type="text" placeholder="Search litters..." oninput="searchLitters(this.value)">
+                    </div>
+                    <div class="sidebar-record-list" id="litterList"></div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-section-header" onclick="toggleSidebarSection('eventsSection', this)">
+                    <h3>Events</h3>
+                    <span class="collapse-arrow">▼</span>
+                </div>
+                <div class="sidebar-collapsible" id="eventsSection">
+                    <div class="search-box" style="margin-top:10px">
+                        <input type="text" placeholder="Search events..." oninput="searchEvents(this.value)">
+                    </div>
+                    <div class="sidebar-record-list" id="eventList"></div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="stats-bar">
+                <div class="stat">Total: <span class="stat-value" id="statTotal">0</span></div>
+                <div class="stat">Active: <span class="stat-value" id="statActive">0</span></div>
+                <div class="stat">Males: <span class="stat-value" id="statMales">0</span></div>
+                <div class="stat">Females: <span class="stat-value" id="statFemales">0</span></div>
+                <div class="stat">Cages: <span class="stat-value" id="statCages">0</span></div>
+                <div class="stat">Matings: <span class="stat-value" id="statMatings">0</span></div>
+                <div class="stat">Litters: <span class="stat-value" id="statLitters">0</span></div>
+            </div>
+            <div class="toolbar">
+                <div class="toolbar-group">
+                    <button class="btn btn-sm btn-secondary" onclick="zoomTimeline(1.2)">🔍+</button>
+                    <button class="btn btn-sm btn-secondary" onclick="zoomTimeline(0.8)">🔍−</button>
+                    <button class="btn btn-sm btn-secondary" onclick="resetTimelineView()">↺ Reset</button>
+                </div>
+                <div class="toolbar-group">
+                    <button class="btn btn-sm btn-secondary" onclick="clearSelection()">Clear Selection</button>
+                </div>
+            </div>
+            <div class="timeline-container" id="timelineContainer">
+                <svg class="timeline-svg" id="timelineSvg"></svg>
+            </div>
+        </main>
+
+        <!-- Detail Panel -->
+        <aside class="detail-panel" id="detailPanel">
+            <div id="detailContent">
+                <div style="text-align:center;padding:40px 20px;color:var(--text-secondary)">
+                    <div style="font-size:3rem;margin-bottom:15px">🐭</div>
+                    <p>Select an animal to view details</p>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="modalContent"></div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // ==================== DATA STORE ====================
+        const ColonyData = {
+            animals: new Map(),
+            matings: new Map(),
+            litters: new Map(),
+            events: new Map(),
+            counters: {
+                animal: 0,
+                mating: 0,
+                litter: 0,
+                event: 0
+            }
+        };
+
+        // ==================== NAME SYSTEM ====================
+        // Each animal has an optional animal.name field (user-defined, globally unique)
+        // getAnimalName returns name if set, else id
+        function getAnimalName(animalId) {
+            const animal = ColonyData.animals.get(animalId);
+            if (!animal) return animalId;
+            return (animal.name && animal.name.trim()) ? animal.name.trim() : animal.id;
+        }
+
+        // Returns true if name is unique across all animals (excluding the given animalId)
+        function isNameUnique(name, excludeId = null) {
+            const trimmed = name.trim().toLowerCase();
+            if (!trimmed) return true;
+            for (const [id, animal] of ColonyData.animals) {
+                if (id === excludeId) continue;
+                // Check against both name and id
+                if ((animal.name && animal.name.trim().toLowerCase() === trimmed) || id.toLowerCase() === trimmed) return false;
+            }
+            return true;
+        }
+
+        // Set animal name, enforcing global uniqueness
+        function setAnimalName(animalId, name) {
+            const animal = ColonyData.animals.get(animalId);
+            if (!animal) return { success: false, error: 'Animal not found' };
+            const trimmed = name.trim();
+            if (!trimmed || trimmed === animal.id) {
+                animal.name = '';
+                return { success: true };
+            }
+            if (!isNameUnique(trimmed, animalId)) {
+                return { success: false, error: `Name "${trimmed}" is already used by another animal` };
+            }
+            animal.name = trimmed;
+            return { success: true };
+        }
+
+        // Display label: "Name (ID)" if name differs from id, else just "ID"
+        function animalLabel(animalId) {
+            const name = getAnimalName(animalId);
+            return name !== animalId ? `${name} (${animalId})` : animalId;
+        }
+
+        // ==================== ID GENERATION ====================
+        function generateId(type) {
+            const prefixes = { animal: 'A', mating: 'M', litter: 'L', event: 'E' };
+            ColonyData.counters[type]++;
+            const num = String(ColonyData.counters[type]).padStart(4, '0');
+            return `${prefixes[type]}-${num}`;
+        }
+
+        function getNextId(type) {
+            const prefixes = { animal: 'A', mating: 'M', litter: 'L', event: 'E' };
+            const num = String(ColonyData.counters[type] + 1).padStart(4, '0');
+            return `${prefixes[type]}-${num}`;
+        }
+
+        function isIdUnique(id) {
+            return !ColonyData.animals.has(id) &&
+                   !ColonyData.matings.has(id) &&
+                   !ColonyData.litters.has(id) &&
+                   !ColonyData.events.has(id);
+        }
+
+        // ==================== VALIDATION ENGINE ====================
+        const Validator = {
+            validateAnimal(data, isEdit = false) {
+                const errors = [];
+                
+                if (!isEdit && !data.id) {
+                    errors.push('Animal ID is required');
+                } else if (!isEdit && !isIdUnique(data.id)) {
+                    errors.push('Animal ID already exists');
+                }
+                
+                if (!data.sex || !['M', 'F'].includes(data.sex)) {
+                    errors.push('Sex must be M or F');
+                }
+                
+                if (!data.dob) {
+                    errors.push('Date of birth is required');
+                }
+                
+                if (!data.cage) {
+                    errors.push('Cage number is required');
+                }
+                
+                // Check parent validity
+                if (data.fatherId && data.fatherId !== 'unknown') {
+                    const father = ColonyData.animals.get(data.fatherId);
+                    if (!father) errors.push('Father ID not found');
+                    else if (father.sex !== 'M') errors.push('Father must be male');
+                }
+                
+                if (data.motherId && data.motherId !== 'unknown') {
+                    const mother = ColonyData.animals.get(data.motherId);
+                    if (!mother) errors.push('Mother ID not found');
+                    else if (mother.sex !== 'F') errors.push('Mother must be female');
+                }
+                
+                return errors;
+            },
+
+            validateMating(data) {
+                const errors = [];
+                
+                if (!data.id) {
+                    errors.push('Mating ID is required');
+                } else if (!isIdUnique(data.id)) {
+                    errors.push('Mating ID already exists');
+                }
+                
+                if (!data.maleId) {
+                    errors.push('Male is required');
+                } else {
+                    const male = ColonyData.animals.get(data.maleId);
+                    if (!male) errors.push('Male not found');
+                    else if (male.sex !== 'M') errors.push('Selected male is not male');
+                    else if (male.status === 'Dead') errors.push('Male is deceased');
+                }
+                
+                if (!data.femaleIds || data.femaleIds.length === 0) {
+                    errors.push('At least one female is required');
+                } else {
+                    data.femaleIds.forEach(fid => {
+                        const female = ColonyData.animals.get(fid);
+                        if (!female) errors.push(`Female ${fid} not found`);
+                        else if (female.sex !== 'F') errors.push(`${fid} is not female`);
+                        else if (female.status === 'Dead') errors.push(`${fid} is deceased`);
+                    });
+                }
+                
+                if (!data.startDate) {
+                    errors.push('Start date is required');
+                }
+                
+                if (data.endDate && data.startDate && new Date(data.endDate) < new Date(data.startDate)) {
+                    errors.push('End date cannot be before start date');
+                }
+                
+                // Check for time conflicts
+                const conflictErrors = this.checkMatingConflicts(data);
+                errors.push(...conflictErrors);
+                
+                return errors;
+            },
+
+            checkMatingConflicts(newMating) {
+                const errors = [];
+                const newStart = new Date(newMating.startDate);
+                const newEnd = newMating.endDate ? new Date(newMating.endDate) : new Date('2099-12-31');
+                
+                for (const [id, mating] of ColonyData.matings) {
+                    if (id === newMating.id) continue;
+                    
+                    const existStart = new Date(mating.startDate);
+                    const existEnd = mating.endDate ? new Date(mating.endDate) : new Date('2099-12-31');
+                    
+                    // Check overlap
+                    if (newStart <= existEnd && newEnd >= existStart) {
+                        // Check if same animals
+                        if (mating.maleId === newMating.maleId) {
+                            errors.push(`Male ${newMating.maleId} is already in mating ${id} during this period`);
+                        }
+                        
+                        newMating.femaleIds.forEach(fid => {
+                            if (mating.femaleIds.includes(fid)) {
+                                errors.push(`Female ${fid} is already in mating ${id} during this period`);
+                            }
+                        });
+                    }
+                }
+                
+                return errors;
+            },
+
+            validateLitter(data) {
+                const errors = [];
+                
+                if (!data.id) {
+                    errors.push('Litter ID is required');
+                } else if (!isIdUnique(data.id)) {
+                    errors.push('Litter ID already exists');
+                }
+                
+                if (!data.matingId) {
+                    errors.push('Mating reference is required');
+                } else {
+                    const mating = ColonyData.matings.get(data.matingId);
+                    if (!mating) {
+                        errors.push('Mating not found');
+                    } else {
+                        if (data.dob && new Date(data.dob) < new Date(mating.startDate)) {
+                            errors.push('Litter DOB cannot be before mating start date');
+                        }
+                        // One litter per mating constraint
+                        const existingLitter = [...ColonyData.litters.values()].find(l => l.matingId === data.matingId && l.id !== data.id);
+                        if (existingLitter) {
+                            errors.push(`Mating ${data.matingId} already has a litter (${existingLitter.id}). One mating can only produce one litter.`);
+                        }
+                    }
+                }
+                
+                if (!data.dob) {
+                    errors.push('Date of birth is required');
+                }
+                
+                const total = parseInt(data.totalPups) || 0;
+                const males = parseInt(data.maleCount) || 0;
+                const females = parseInt(data.femaleCount) || 0;
+                
+                if (total <= 0) {
+                    errors.push('Total pups must be greater than 0');
+                }
+                
+                if (males + females !== total) {
+                    errors.push('Male + Female count must equal total pups');
+                }
+                
+                return errors;
+            },
+
+            validateEvent(data, isEdit = false) {
+                const errors = [];
+                
+                if (!isEdit) {
+                    if (!data.id) {
+                        errors.push('Event ID is required');
+                    } else if (!isIdUnique(data.id)) {
+                        errors.push('Event ID already exists');
+                    }
+                }
+                
+                if (!data.animalId) {
+                    errors.push('Animal is required');
+                } else {
+                    const animal = ColonyData.animals.get(data.animalId);
+                    if (!animal) {
+                        errors.push('Animal not found');
+                    } else {
+                        // Check event is not before birth (applies to ALL event types including Death)
+                        if (data.date && new Date(data.date) < new Date(animal.dob)) {
+                            errors.push(`Event date (${data.date}) cannot be before animal birth date (${animal.dob})`);
+                        }
+                        // Check if event is after death (only for non-death events)
+                        const deathEvent = this.getDeathEvent(data.animalId);
+                        if (deathEvent && data.type !== 'Death' && data.date && new Date(data.date) > new Date(deathEvent.date)) {
+                            errors.push(`Cannot add events after death date (${deathEvent.date})`);
+                        }
+                    }
+                }
+                
+                if (!data.type) {
+                    errors.push('Event type is required');
+                }
+                
+                if (!data.date) {
+                    errors.push('Event date is required');
+                }
+                
+                return errors;
+            },
+
+            getDeathEvent(animalId) {
+                for (const [id, event] of ColonyData.events) {
+                    if (event.animalId === animalId && event.type === 'Death') {
+                        return event;
+                    }
+                }
+                return null;
+            },
+
+            canDeleteAnimal(animalId) {
+                // Check for offspring
+                for (const [id, animal] of ColonyData.animals) {
+                    if (animal.fatherId === animalId || animal.motherId === animalId) {
+                        return { allowed: false, reason: 'Animal has offspring' };
+                    }
+                }
+                
+                // Check for matings
+                for (const [id, mating] of ColonyData.matings) {
+                    if (mating.maleId === animalId || mating.femaleIds.includes(animalId)) {
+                        return { allowed: false, reason: 'Animal is part of a mating' };
+                    }
+                }
+                
+                return { allowed: true };
+            }
+        };
+
+        // ==================== CRUD OPERATIONS ====================
+        function addAnimal(data) {
+            const errors = Validator.validateAnimal(data);
+            if (errors.length > 0) {
+                return { success: false, errors };
+            }
+            
+            const animal = {
+                id: data.id,
+                name: (data.name && data.name.trim() && data.name.trim() !== data.id) ? data.name.trim() : '',
+                sex: data.sex,
+                dob: data.dob,
+                cage: data.cage,
+                status: data.status || 'Active',
+                fatherId: data.fatherId || null,
+                motherId: data.motherId || null,
+                comments: data.comments || ''
+            };
+            
+            ColonyData.animals.set(animal.id, animal);
+            updateUI();
+            return { success: true, animal };
+        }
+
+        function updateAnimal(id, data) {
+            const animal = ColonyData.animals.get(id);
+            if (!animal) {
+                return { success: false, errors: ['Animal not found'] };
+            }
+            
+            const errors = Validator.validateAnimal({ ...animal, ...data }, true);
+            if (errors.length > 0) {
+                return { success: false, errors };
+            }
+            
+            // Don't allow changing sex if in mating
+            if (data.sex && data.sex !== animal.sex) {
+                for (const [mid, mating] of ColonyData.matings) {
+                    if (mating.maleId === id || mating.femaleIds.includes(id)) {
+                        return { success: false, errors: ['Cannot change sex - animal is in a mating'] };
+                    }
+                }
+            }
+            
+            // Handle name update — just store directly on animal object
+            if (data.name !== undefined) {
+                const trimmed = (data.name || '').trim();
+                animal.name = (trimmed && trimmed !== animal.id) ? trimmed : '';
+                delete data.name;
+            }
+            
+            Object.assign(animal, data);
+            updateUI();
+            return { success: true, animal };
+        }
+
+        function deleteAnimal(id) {
+            const check = Validator.canDeleteAnimal(id);
+            if (!check.allowed) {
+                return { success: false, errors: [check.reason] };
+            }
+            
+            // Delete associated events
+            for (const [eid, event] of ColonyData.events) {
+                if (event.animalId === id) {
+                    ColonyData.events.delete(eid);
+                }
+            }
+            
+            ColonyData.animals.delete(id);
+            updateUI();
+            return { success: true };
+        }
+
+        function addMating(data) {
+            const errors = Validator.validateMating(data);
+            if (errors.length > 0) {
+                return { success: false, errors };
+            }
+            
+            const mating = {
+                id: data.id,
+                maleId: data.maleId,
+                femaleIds: data.femaleIds,
+                startDate: data.startDate,
+                endDate: data.endDate || null,
+                cage: data.cage || '',
+                comments: data.comments || ''
+            };
+            
+            ColonyData.matings.set(mating.id, mating);
+            updateUI();
+            return { success: true, mating };
+        }
+
+        function endMating(id, endDate) {
+            const mating = ColonyData.matings.get(id);
+            if (!mating) {
+                return { success: false, errors: ['Mating not found'] };
+            }
+            
+            if (new Date(endDate) < new Date(mating.startDate)) {
+                return { success: false, errors: ['End date cannot be before start date'] };
+            }
+            
+            mating.endDate = endDate;
+            updateUI();
+            return { success: true };
+        }
+
+        function addLitter(data) {
+            const errors = Validator.validateLitter(data);
+            if (errors.length > 0) {
+                return { success: false, errors };
+            }
+            
+            const mating = ColonyData.matings.get(data.matingId);
+            
+            // Calculate litter number for this mating
+            let litterNum = 1;
+            for (const [id, litter] of ColonyData.litters) {
+                if (litter.matingId === data.matingId) {
+                    litterNum++;
+                }
+            }
+            
+            const litter = {
+                id: data.id,
+                matingId: data.matingId,
+                dob: data.dob,
+                totalPups: parseInt(data.totalPups),
+                maleCount: parseInt(data.maleCount),
+                femaleCount: parseInt(data.femaleCount),
+                litterNumber: litterNum,
+                children: [],
+                comments: data.comments || ''
+            };
+            
+            // Create child animals
+            for (let i = 0; i < litter.maleCount; i++) {
+                const childId = generateId('animal');
+                const child = {
+                    id: childId,
+                    sex: 'M',
+                    dob: data.dob,
+                    cage: data.cage || mating.cage || '',
+                    status: 'Active',
+                    fatherId: mating.maleId,
+                    motherId: data.motherId || mating.femaleIds[0],
+                    comments: `From litter ${litter.id}`
+                };
+                ColonyData.animals.set(childId, child);
+                litter.children.push(childId);
+            }
+            
+            for (let i = 0; i < litter.femaleCount; i++) {
+                const childId = generateId('animal');
+                const child = {
+                    id: childId,
+                    sex: 'F',
+                    dob: data.dob,
+                    cage: data.cage || mating.cage || '',
+                    status: 'Active',
+                    fatherId: mating.maleId,
+                    motherId: data.motherId || mating.femaleIds[0],
+                    comments: `From litter ${litter.id}`
+                };
+                ColonyData.animals.set(childId, child);
+                litter.children.push(childId);
+            }
+            
+            ColonyData.litters.set(litter.id, litter);
+            updateUI();
+            return { success: true, litter };
+        }
+
+        function addEvent(data) {
+            const errors = Validator.validateEvent(data);
+            if (errors.length > 0) {
+                return { success: false, errors };
+            }
+            
+            const event = {
+                id: data.id,
+                animalId: data.animalId,
+                type: data.type,
+                date: data.date,
+                comments: data.comments || ''
+            };
+            
+            ColonyData.events.set(event.id, event);
+            
+            // If death event, update animal status
+            if (event.type === 'Death') {
+                const animal = ColonyData.animals.get(event.animalId);
+                if (animal) {
+                    animal.status = 'Dead';
+                    
+                    // End any active matings
+                    for (const [id, mating] of ColonyData.matings) {
+                        if (!mating.endDate && 
+                            (mating.maleId === event.animalId || mating.femaleIds.includes(event.animalId))) {
+                            mating.endDate = event.date;
+                        }
+                    }
+                }
+            }
+            
+            if (event.type === 'Separation') {
+                const animal = ColonyData.animals.get(event.animalId);
+                if (animal) {
+                    animal.status = 'Separated';
+                }
+            }
+            
+            updateUI();
+            return { success: true, event };
+        }
+
+        // ==================== LINEAGE ENGINE ====================
+        const LineageEngine = {
+            getParents(animalId, generations = Infinity, visited = new Set()) {
+                if (visited.has(animalId)) return [];
+                visited.add(animalId);
+                
+                const animal = ColonyData.animals.get(animalId);
+                if (!animal || generations <= 0) return [];
+                
+                const parents = [];
+                
+                if (animal.fatherId && animal.fatherId !== 'unknown') {
+                    parents.push(animal.fatherId);
+                    if (generations > 1) {
+                        parents.push(...this.getParents(animal.fatherId, generations - 1, visited));
+                    }
+                }
+                
+                if (animal.motherId && animal.motherId !== 'unknown') {
+                    parents.push(animal.motherId);
+                    if (generations > 1) {
+                        parents.push(...this.getParents(animal.motherId, generations - 1, visited));
+                    }
+                }
+                
+                return [...new Set(parents)];
+            },
+
+            getOffspring(animalId, generations = Infinity, visited = new Set()) {
+                if (visited.has(animalId)) return [];
+                visited.add(animalId);
+                
+                if (generations <= 0) return [];
+                
+                const offspring = [];
+                
+                for (const [id, animal] of ColonyData.animals) {
+                    if (animal.fatherId === animalId || animal.motherId === animalId) {
+                        offspring.push(id);
+                        if (generations > 1) {
+                            offspring.push(...this.getOffspring(id, generations - 1, visited));
+                        }
+                    }
+                }
+                
+                return [...new Set(offspring)];
+            },
+
+            getMates(animalId) {
+                const mates = new Set();
+                
+                for (const [id, mating] of ColonyData.matings) {
+                    if (mating.maleId === animalId) {
+                        mating.femaleIds.forEach(fid => mates.add(fid));
+                    }
+                    if (mating.femaleIds.includes(animalId)) {
+                        mates.add(mating.maleId);
+                    }
+                }
+                
+                return [...mates];
+            },
+
+            getRelatedAnimals(animalId) {
+                const related = new Set();
+                
+                this.getParents(animalId).forEach(id => related.add(id));
+                this.getOffspring(animalId).forEach(id => related.add(id));
+                this.getMates(animalId).forEach(id => related.add(id));
+                
+                return [...related];
+            },
+
+            getMatings(animalId) {
+                const matings = [];
+                for (const [id, mating] of ColonyData.matings) {
+                    if (mating.maleId === animalId || mating.femaleIds.includes(animalId)) {
+                        matings.push(mating);
+                    }
+                }
+                return matings;
+            },
+
+            getLitters(animalId) {
+                const matings = this.getMatings(animalId);
+                const litters = [];
+                for (const [id, litter] of ColonyData.litters) {
+                    if (matings.some(m => m.id === litter.matingId)) {
+                        litters.push(litter);
+                    }
+                }
+                return litters;
+            }
+        };
+
+        // ==================== UI STATE ====================
+        let selectedAnimalId = null;
+        let selectedMatingId = null;
+        let selectedLitterId = null;
+        let selectedEventId = null;
+        let currentFilter = 'all';
+        let searchQuery = '';
+        let searchMatingQuery = '';
+        let searchLitterQuery = '';
+        let searchEventQuery = '';
+        let timelineZoom = 1;
+        let timelinePan = { x: 0, y: 0 };
+        let isDarkTheme = true;
+
+        // ==================== THEME ====================
+        function toggleTheme() {
+            isDarkTheme = !isDarkTheme;
+            document.body.classList.toggle('theme-light', !isDarkTheme);
+            document.getElementById('themeToggleBtn').textContent = isDarkTheme ? '☀️ Light Theme' : '🌙 Dark Theme';
+        }
+
+        // ==================== SIDEBAR COLLAPSE ====================
+        function toggleSidebarSection(sectionId, header) {
+            const section = document.getElementById(sectionId);
+            const isCollapsed = section.classList.toggle('collapsed');
+            header.classList.toggle('collapsed', isCollapsed);
+        }
+
+        // ==================== UI UPDATES ====================
+        function updateUI() {
+            renderAnimalList();
+            renderMatingList();
+            renderLitterList();
+            renderEventList();
+            renderTimeline();
+            updateStats();
+            if (selectedAnimalId) {
+                renderDetailPanel(selectedAnimalId);
+            }
+        }
+
+        function updateStats() {
+            const animals = [...ColonyData.animals.values()];
+            const activeAnimals = animals.filter(a => a.status === 'Active');
+            const activeCages = new Set(activeAnimals.map(a => a.cage)).size;
+            document.getElementById('statTotal').textContent = animals.length;
+            document.getElementById('statActive').textContent = activeAnimals.length;
+            document.getElementById('statMales').textContent = animals.filter(a => a.sex === 'M').length;
+            document.getElementById('statFemales').textContent = animals.filter(a => a.sex === 'F').length;
+            document.getElementById('statCages').textContent = activeCages;
+            document.getElementById('statMatings').textContent = ColonyData.matings.size;
+            document.getElementById('statLitters').textContent = ColonyData.litters.size;
+        }
+
+        function renderAnimalList() {
+            const container = document.getElementById('animalList');
+            let animals = [...ColonyData.animals.values()];
+            
+            // Apply filter
+            if (currentFilter === 'active') {
+                animals = animals.filter(a => a.status === 'Active');
+            } else if (currentFilter === 'male') {
+                animals = animals.filter(a => a.sex === 'M');
+            } else if (currentFilter === 'female') {
+                animals = animals.filter(a => a.sex === 'F');
+            } else if (currentFilter === 'dead') {
+                animals = animals.filter(a => a.status === 'Dead');
+            }
+            
+            // Apply search
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                animals = animals.filter(a => 
+                    a.id.toLowerCase().includes(q) ||
+                    getAnimalName(a.id).toLowerCase().includes(q) ||
+                    a.cage.toLowerCase().includes(q) ||
+                    (a.comments && a.comments.toLowerCase().includes(q))
+                );
+            }
+            
+            // Sort by ID
+            animals.sort((a, b) => a.id.localeCompare(b.id));
+            
+            // Get related animals for dimming
+            const relatedIds = selectedAnimalId ? 
+                new Set([selectedAnimalId, ...LineageEngine.getRelatedAnimals(selectedAnimalId)]) : 
+                null;
+            
+            container.innerHTML = animals.map(animal => {
+                const age = calculateAge(animal.dob, animal.id);
+                const ageClass = getAgeClass(age);
+                const isDead = animal.status === 'Dead';
+                const isSelected = animal.id === selectedAnimalId;
+                const isDimmed = relatedIds && !relatedIds.has(animal.id);
+                const displayName = getAnimalName(animal.id);
+                
+                return `
+                    <div class="animal-item ${isSelected ? 'selected' : ''} ${isDimmed ? 'dimmed' : ''}" 
+                         onclick="selectAnimal('${animal.id}')">
+                        <div class="animal-icon ${animal.sex === 'M' ? 'male' : 'female'} ${isDead ? 'dead' : ''}">
+                            ${animal.sex === 'M' ? '♂' : '♀'}
+                        </div>
+                        <div class="animal-info">
+                            <div class="id">${displayName !== animal.id ? `<span style="font-weight:700">${displayName}</span> <span style="color:var(--text-secondary);font-size:0.8rem">${animal.id}</span>` : animal.id}</div>
+                            <div class="meta">Cage: ${animal.cage} • ${animal.status}</div>
+                        </div>
+                        <span class="animal-age ${ageClass}">${age}d</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function calculateAge(dob, animalId) {
+            const birth = new Date(dob);
+            // If animal has a death event, age stops at that date
+            let endDate = new Date();
+            if (animalId) {
+                const deathEv = Validator.getDeathEvent ? Validator.getDeathEvent(animalId) : null;
+                if (deathEv) endDate = new Date(deathEv.date);
+            }
+            const diffTime = Math.abs(endDate - birth);
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        function getAgeClass(days) {
+            if (days < 21) return 'age-young';
+            if (days < 60) return 'age-adult';
+            if (days < 180) return 'age-mature';
+            if (days < 365) return 'age-old';
+            return 'age-senior';
+        }
+
+        function selectAnimal(id) {
+            selectedAnimalId = id;
+            renderAnimalList();
+            renderTimeline();
+            renderDetailPanel(id);
+        }
+
+        function clearSelection() {
+            selectedAnimalId = null;
+            selectedMatingId = null;
+            selectedLitterId = null;
+            selectedEventId = null;
+            renderAnimalList();
+            renderMatingList();
+            renderLitterList();
+            renderEventList();
+            renderTimeline();
+            document.getElementById('detailContent').innerHTML = `
+                <div style="text-align:center;padding:40px 20px;color:var(--text-secondary)">
+                    <div style="font-size:3rem;margin-bottom:15px">🐭</div>
+                    <p>Select an animal to view details</p>
+                </div>
+            `;
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-tag').forEach(tag => {
+                tag.classList.toggle('active', tag.dataset.filter === filter);
+            });
+            renderAnimalList();
+        }
+
+        function saveAnimalName(animalId, newName) {
+            const result = setAnimalName(animalId, newName);
+            if (!result.success) {
+                showToast(result.error, 'error');
+                // Revert the input to the previous valid name
+                const input = document.getElementById(`animalNameInput_${animalId}`);
+                if (input) input.value = getAnimalName(animalId);
+                return;
+            }
+            // Reflect everywhere
+            renderAnimalList();
+            renderMatingList();
+            renderLitterList();
+            renderEventList();
+            renderTimeline();
+            updateStats();
+            // Update the detail panel subtitle without full re-render
+            const animal = ColonyData.animals.get(animalId);
+            if (animal) {
+                const name = getAnimalName(animalId);
+                const input = document.getElementById(`animalNameInput_${animalId}`);
+                if (input) input.value = name;
+            }
+        }
+
+        function searchAnimals(query) {
+            searchQuery = query;
+            renderAnimalList();
+        }
+
+        function searchMatings(q) { searchMatingQuery = q; renderMatingList(); }
+        function searchLitters(q) { searchLitterQuery = q; renderLitterList(); }
+        function searchEvents(q) { searchEventQuery = q; renderEventList(); }
+
+        function renderMatingList() {
+            const container = document.getElementById('matingList');
+            let matings = [...ColonyData.matings.values()];
+            if (searchMatingQuery) {
+                const q = searchMatingQuery.toLowerCase();
+                matings = matings.filter(m =>
+                    m.id.toLowerCase().includes(q) ||
+                    m.maleId.toLowerCase().includes(q) ||
+                    m.femaleIds.some(f => f.toLowerCase().includes(q)) ||
+                    (m.cage && m.cage.toLowerCase().includes(q)) ||
+                    (m.comments && m.comments.toLowerCase().includes(q))
+                );
+            }
+            if (matings.length === 0) {
+                container.innerHTML = `<div style="color:var(--text-secondary);font-size:0.8rem;padding:6px 0">${searchMatingQuery ? 'No matches' : 'No matings yet'}</div>`;
+                return;
+            }
+            container.innerHTML = matings.map(m => {
+                const isSelected = m.id === selectedMatingId;
+                const status = m.endDate ? `${m.startDate} – ${m.endDate}` : `${m.startDate} → ongoing`;
+                return `
+                    <div class="sidebar-record-item ${isSelected ? 'selected' : ''}" onclick="selectMating('${m.id}')">
+                        <div class="record-icon mating-icon">🔗</div>
+                        <div class="record-info">
+                            <div class="rid">${m.id}</div>
+                            <div class="rmeta">${m.maleId} × ${m.femaleIds.join(', ')}</div>
+                            <div class="rmeta">${status}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderLitterList() {
+            const container = document.getElementById('litterList');
+            let litters = [...ColonyData.litters.values()];
+            if (searchLitterQuery) {
+                const q = searchLitterQuery.toLowerCase();
+                litters = litters.filter(l =>
+                    l.id.toLowerCase().includes(q) ||
+                    l.matingId.toLowerCase().includes(q) ||
+                    l.dob.includes(q) ||
+                    (l.comments && l.comments.toLowerCase().includes(q))
+                );
+            }
+            if (litters.length === 0) {
+                container.innerHTML = `<div style="color:var(--text-secondary);font-size:0.8rem;padding:6px 0">${searchLitterQuery ? 'No matches' : 'No litters yet'}</div>`;
+                return;
+            }
+            container.innerHTML = litters.map(l => {
+                const isSelected = l.id === selectedLitterId;
+                let badge = '';
+                let subtitle = `from ${l.matingId} • ${l.dob}`;
+                let sub2 = `${l.totalPups} pups (♂${l.maleCount} ♀${l.femaleCount})`;
+                if (l.matingFailure) { badge = '🚫'; sub2 = 'Mating failure'; }
+                else if (l.allDead) { badge = '☠️'; sub2 = `${l.totalPups} stillborn`; }
+                return `
+                    <div class="sidebar-record-item ${isSelected ? 'selected' : ''}" onclick="selectLitter('${l.id}')">
+                        <div class="record-icon litter-icon">${badge || '🐣'}</div>
+                        <div class="record-info">
+                            <div class="rid">${l.id}</div>
+                            <div class="rmeta">${subtitle}</div>
+                            <div class="rmeta">${sub2}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderEventList() {
+            const container = document.getElementById('eventList');
+            let events = [...ColonyData.events.values()];
+            if (searchEventQuery) {
+                const q = searchEventQuery.toLowerCase();
+                events = events.filter(e =>
+                    e.id.toLowerCase().includes(q) ||
+                    e.type.toLowerCase().includes(q) ||
+                    e.animalId.toLowerCase().includes(q) ||
+                    e.date.includes(q) ||
+                    (e.comments && e.comments.toLowerCase().includes(q))
+                );
+            }
+            if (events.length === 0) {
+                container.innerHTML = `<div style="color:var(--text-secondary);font-size:0.8rem;padding:6px 0">${searchEventQuery ? 'No matches' : 'No events yet'}</div>`;
+                return;
+            }
+            container.innerHTML = events.map(e => {
+                const isSelected = e.id === selectedEventId;
+                return `
+                    <div class="sidebar-record-item ${isSelected ? 'selected' : ''}" onclick="selectEvent('${e.id}')">
+                        <div class="record-icon event-icon">📅</div>
+                        <div class="record-info">
+                            <div class="rid">${e.id}</div>
+                            <div class="rmeta">${e.type} • ${e.animalId}</div>
+                            <div class="rmeta">${e.date}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectMating(id) {
+            selectedMatingId = id === selectedMatingId ? null : id;
+            selectedLitterId = null;
+            selectedEventId = null;
+            renderMatingList();
+            renderLitterList();
+            renderEventList();
+            if (selectedMatingId) showMatingDetail(selectedMatingId);
+        }
+
+        function selectLitter(id) {
+            selectedLitterId = id === selectedLitterId ? null : id;
+            selectedMatingId = null;
+            selectedEventId = null;
+            renderMatingList();
+            renderLitterList();
+            renderEventList();
+            if (selectedLitterId) showLitterDetail(selectedLitterId);
+        }
+
+        function selectEvent(id) {
+            selectedEventId = id === selectedEventId ? null : id;
+            selectedMatingId = null;
+            selectedLitterId = null;
+            renderMatingList();
+            renderLitterList();
+            renderEventList();
+            if (selectedEventId) showEventDetail(selectedEventId);
+        }
+
+        function showMatingDetail(id) {
+            const m = ColonyData.matings.get(id);
+            if (!m) return;
+            const litter = [...ColonyData.litters.values()].find(l => l.matingId === id);
+            const male = ColonyData.animals.get(m.maleId);
+            const html = `
+                <div class="detail-header">
+                    <div class="detail-icon" style="background:rgba(78,204,163,0.15);color:var(--accent);font-size:1.8rem">🔗</div>
+                    <div class="detail-title">
+                        <h2>${m.id}</h2>
+                        <span style="color:var(--text-secondary)">${m.endDate ? 'Ended' : 'Active'}</span>
+                    </div>
+                </div>
+                <div class="detail-stats">
+                    <div class="stat-card">
+                        <div class="label">Male</div>
+                        <div class="value" style="cursor:pointer;color:var(--male-color)" onclick="selectAnimal('${m.maleId}')">${m.maleId}</div>
+                        ${male ? `<div style="font-size:0.75rem;color:var(--text-secondary)">Cage ${male.cage}</div>` : ''}
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Female(s)</div>
+                        <div class="value">${m.femaleIds.map(f => {
+                            const fa = ColonyData.animals.get(f);
+                            return `<div><span style="cursor:pointer;color:var(--female-color)" onclick="selectAnimal('${f}')">${f}</span>${fa ? ` <span style="font-size:0.75rem;color:var(--text-secondary)">Cage ${fa.cage}</span>` : ''}</div>`;
+                        }).join('')}</div>
+                    </div>
+                    <div class="stat-card"><div class="label">Start Date</div><div class="value">${m.startDate}</div></div>
+                    <div class="stat-card"><div class="label">End Date</div><div class="value">${m.endDate || '—'}</div></div>
+                    ${m.cage ? `<div class="stat-card"><div class="label">Mating Cage</div><div class="value">${m.cage}</div></div>` : ''}
+                </div>
+                ${litter ? `
+                    <div class="detail-section"><h4>Litter</h4>
+                    <div class="relation-list">
+                        <div class="relation-item" onclick="selectLitter('${litter.id}')">
+                            <span>${litter.matingFailure ? '🚫' : litter.allDead ? '☠️' : '🐣'}</span>
+                            <span>${litter.id}</span>
+                            <span class="relation-badge">${litter.matingFailure ? 'Failure' : litter.dob}</span>
+                            <span style="color:var(--text-secondary);font-size:0.8rem">${litter.matingFailure ? 'Not pregnant' : litter.totalPups + ' pups'}</span>
+                        </div>
+                    </div></div>
+                ` : '<div style="color:var(--text-secondary);font-size:0.85rem;padding:8px 0">No litter recorded yet</div>'}
+                ${m.comments ? `<div class="detail-section"><h4>Comments</h4><p style="color:var(--text-secondary);font-size:0.9rem">${m.comments}</p></div>` : ''}
+                <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
+                    <button class="btn btn-secondary btn-sm" onclick="openEditMatingModal('${m.id}')">✏️ Edit</button>
+                    <button class="btn btn-danger btn-sm" onclick="confirmDeleteMating('${m.id}')">🗑️ Delete</button>
+                </div>
+            `;
+            document.getElementById('detailContent').innerHTML = html;
+        }
+
+        function showLitterDetail(id) {
+            const l = ColonyData.litters.get(id);
+            if (!l) return;
+            const mating = ColonyData.matings.get(l.matingId);
+
+            const iconEmoji = l.matingFailure ? '🚫' : l.allDead ? '☠️' : '🐣';
+            const iconBg = l.matingFailure ? 'rgba(255,107,107,0.15)' : 'rgba(255,217,61,0.15)';
+            const iconColor = l.matingFailure ? 'var(--error)' : l.allDead ? 'var(--error)' : '#ffd93d';
+            const subtitle = l.matingFailure
+                ? `<span style="color:var(--error)">🚫 Mating Failure</span>`
+                : l.allDead
+                    ? `from ${l.matingId} <span style="color:var(--error)">☠️ Stillbirth</span>`
+                    : `from ${l.matingId}`;
+
+            const html = `
+                <div class="detail-header">
+                    <div class="detail-icon" style="background:${iconBg};color:${iconColor};font-size:1.8rem">${iconEmoji}</div>
+                    <div class="detail-title">
+                        <h2>${l.id}</h2>
+                        <span style="color:var(--text-secondary)">${subtitle}</span>
+                    </div>
+                </div>
+                ${!l.matingFailure ? `
+                <div class="detail-stats">
+                    <div class="stat-card"><div class="label">DOB</div><div class="value">${l.dob}</div></div>
+                    <div class="stat-card"><div class="label">Total Pups</div><div class="value">${l.totalPups}${l.allDead ? ' ☠️' : ''}</div></div>
+                    <div class="stat-card"><div class="label">♂ Males</div><div class="value">${l.maleCount}</div></div>
+                    <div class="stat-card"><div class="label">♀ Females</div><div class="value">${l.femaleCount}</div></div>
+                </div>` : `
+                <div style="background:var(--bg-card);border-radius:8px;padding:12px;margin-bottom:16px;font-size:0.88rem;color:var(--text-secondary)">
+                    Female(s) were not pregnant and have been marked <strong>Separated</strong>. Mating ended on ${l.dob}.
+                </div>`}
+                ${mating ? `
+                    <div class="detail-section"><h4>From Mating</h4>
+                    <div class="relation-list">
+                        <div class="relation-item" onclick="selectMating('${mating.id}')">
+                            <span>🔗</span><span>${mating.id}</span>
+                            <span class="relation-badge">${mating.maleId} × ${mating.femaleIds.join(', ')}</span>
+                        </div>
+                    </div></div>
+                ` : ''}
+                ${l.children.length > 0 ? `
+                    <div class="detail-section"><h4>${l.allDead ? '☠️ Stillborn Pups' : 'Offspring'} (${l.children.length})</h4>
+                    <div class="relation-list">
+                        ${l.children.map(cid => {
+                            const c = ColonyData.animals.get(cid);
+                            const name = getAnimalName(cid);
+                            return c ? `<div class="relation-item" onclick="selectAnimal('${cid}')">
+                                <span>${c.sex==='M'?'♂':'♀'}</span>
+                                <span>${name !== cid ? `<strong>${name}</strong> <span style="color:var(--text-secondary);font-size:0.8rem">${cid}</span>` : cid}</span>
+                                <span style="color:var(--text-secondary);font-size:0.8rem">Cage ${c.cage}</span>
+                                ${c.status === 'Dead' ? `<span style="color:var(--error);font-size:0.75rem">☠</span>` : ''}
+                            </div>` : '';
+                        }).join('')}
+                    </div></div>
+                ` : (!l.matingFailure && l.allDead) ? `<div style="color:var(--error);font-size:0.85rem;padding:8px 0">☠️ All pups stillborn — shown as dead animals on timeline</div>` : ''}
+                ${l.comments ? `<div class="detail-section"><h4>Comments</h4><p style="color:var(--text-secondary);font-size:0.9rem">${l.comments}</p></div>` : ''}
+                <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
+                    <button class="btn btn-secondary btn-sm" onclick="openEditLitterModal('${l.id}')">✏️ Edit</button>
+                    <button class="btn btn-danger btn-sm" onclick="confirmDeleteLitter('${l.id}')">🗑️ Delete</button>
+                </div>
+            `;
+            document.getElementById('detailContent').innerHTML = html;
+        }
+
+        function showEventDetail(id) {
+            const e = ColonyData.events.get(id);
+            if (!e) return;
+            const animal = ColonyData.animals.get(e.animalId);
+            const eventColors = { 'Weaning': '#3498db', 'Separation': '#9b59b6', 'Transfer': '#e67e22', 'Health check': '#2ecc71', 'Death': 'var(--error)', 'Custom': '#95a5a6' };
+            const color = eventColors[e.type] || '#95a5a6';
+            const html = `
+                <div class="detail-header">
+                    <div class="detail-icon" style="background:rgba(100,149,237,0.15);color:${color};font-size:1.8rem">📅</div>
+                    <div class="detail-title">
+                        <h2>${e.id}</h2>
+                        <span style="color:${color}">${e.type}</span>
+                    </div>
+                </div>
+                <div class="detail-stats">
+                    <div class="stat-card">
+                        <div class="label">Animal</div>
+                        <div class="value" style="cursor:pointer;color:var(--accent)" onclick="selectAnimal('${e.animalId}')">${e.animalId}</div>
+                        ${animal ? `<div style="font-size:0.75rem;color:var(--text-secondary)">Cage ${animal.cage} • ${animal.status}</div>` : ''}
+                    </div>
+                    <div class="stat-card"><div class="label">Date</div><div class="value">${e.date}</div></div>
+                </div>
+                ${e.comments ? `<div class="detail-section"><h4>Comments</h4><p style="color:var(--text-secondary);font-size:0.9rem">${e.comments}</p></div>` : ''}
+                <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
+                    <button class="btn btn-secondary btn-sm" onclick="openEditEventModal('${e.id}')">✏️ Edit</button>
+                    <button class="btn btn-danger btn-sm" onclick="confirmDeleteEvent('${e.id}')">🗑️ Delete</button>
+                </div>
+            `;
+            document.getElementById('detailContent').innerHTML = html;
+        }
+
+        // ==================== DELETE MATINGS / LITTERS / EVENTS ====================
+        function confirmDeleteMating(matingId) {
+            const litter = [...ColonyData.litters.values()].find(l => l.matingId === matingId);
+            const eventsAffected = litter
+                ? [...ColonyData.events.values()].filter(e => litter.children.includes(e.animalId))
+                : [];
+            const html = `
+                <div class="modal-header">
+                    <h2>⚠️ Confirm Delete Mating</h2>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="confirm-dialog">
+                        <div class="icon">🗑️</div>
+                        <p>Delete mating <strong>${matingId}</strong>?</p>
+                        ${litter ? `<p style="color:var(--warning);margin-top:8px">⚠️ This will also delete litter <strong>${litter.id}</strong> and its ${litter.children.length} offspring animals${eventsAffected.length ? ` and ${eventsAffected.length} associated events` : ''}.</p>` : ''}
+                        <p style="color:var(--text-secondary);font-size:0.85rem;margin-top:8px">This action cannot be undone.</p>
+                        <div class="confirm-actions">
+                            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                            <button class="btn btn-danger" onclick="executeDeleteMating('${matingId}')">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function executeDeleteMating(matingId) {
+            // Delete associated litter and its children + events
+            for (const [lid, litter] of ColonyData.litters) {
+                if (litter.matingId === matingId) {
+                    // Delete child animals and their events
+                    litter.children.forEach(cid => {
+                        for (const [eid, ev] of ColonyData.events) {
+                            if (ev.animalId === cid) ColonyData.events.delete(eid);
+                        }
+                        ColonyData.animals.delete(cid);
+                    });
+                    ColonyData.litters.delete(lid);
+                }
+            }
+            ColonyData.matings.delete(matingId);
+            selectedMatingId = null;
+            selectedLitterId = null;
+            closeModal();
+            updateUI();
+            clearSelection();
+            showToast(`Mating ${matingId} and all associated records deleted`);
+        }
+
+        function confirmDeleteLitter(litterId) {
+            const l = ColonyData.litters.get(litterId);
+            if (!l) return;
+            const html = `
+                <div class="modal-header">
+                    <h2>⚠️ Confirm Delete Litter</h2>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="confirm-dialog">
+                        <div class="icon">🗑️</div>
+                        <p>Delete litter <strong>${litterId}</strong>?</p>
+                        <p style="color:var(--warning);margin-top:8px">⚠️ This will also delete its <strong>${l.children.length} offspring animals</strong> and their events.</p>
+                        <p style="color:var(--text-secondary);font-size:0.85rem;margin-top:8px">This action cannot be undone.</p>
+                        <div class="confirm-actions">
+                            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                            <button class="btn btn-danger" onclick="executeDeleteLitter('${litterId}')">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function executeDeleteLitter(litterId) {
+            const l = ColonyData.litters.get(litterId);
+            if (!l) return;
+            l.children.forEach(cid => {
+                for (const [eid, ev] of ColonyData.events) {
+                    if (ev.animalId === cid) ColonyData.events.delete(eid);
+                }
+                ColonyData.animals.delete(cid);
+            });
+            ColonyData.litters.delete(litterId);
+            selectedLitterId = null;
+            closeModal();
+            updateUI();
+            clearSelection();
+            showToast(`Litter ${litterId} and offspring deleted`);
+        }
+
+        function confirmDeleteEvent(eventId) {
+            const e = ColonyData.events.get(eventId);
+            if (!e) return;
+            const html = `
+                <div class="modal-header">
+                    <h2>⚠️ Confirm Delete Event</h2>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="confirm-dialog">
+                        <div class="icon">🗑️</div>
+                        <p>Delete event <strong>${eventId}</strong> (${e.type} on ${e.date} for ${e.animalId})?</p>
+                        <p style="color:var(--text-secondary);font-size:0.85rem;margin-top:8px">This action cannot be undone.</p>
+                        <div class="confirm-actions">
+                            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                            <button class="btn btn-danger" onclick="executeDeleteEvent('${eventId}')">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function executeDeleteEvent(eventId) {
+            const e = ColonyData.events.get(eventId);
+            if (e && e.type === 'Death') {
+                // Revert animal status if this was a death event
+                const animal = ColonyData.animals.get(e.animalId);
+                if (animal && animal.status === 'Dead') animal.status = 'Active';
+            }
+            ColonyData.events.delete(eventId);
+            selectedEventId = null;
+            closeModal();
+            updateUI();
+            clearSelection();
+            showToast(`Event ${eventId} deleted`);
+        }
+
+        // ==================== DETAIL PANEL ====================
+        function renderDetailPanel(animalId) {
+            const animal = ColonyData.animals.get(animalId);
+            if (!animal) return;
+            
+            const age = calculateAge(animal.dob, animalId);
+            const ageClass = getAgeClass(age);
+            const displayName = getAnimalName(animalId);
+            const parents = [];
+            if (animal.fatherId && animal.fatherId !== 'unknown') {
+                parents.push({ id: animal.fatherId, role: 'Father' });
+            }
+            if (animal.motherId && animal.motherId !== 'unknown') {
+                parents.push({ id: animal.motherId, role: 'Mother' });
+            }
+            const offspring = LineageEngine.getOffspring(animalId, 1);
+            const mates = LineageEngine.getMates(animalId);
+            const matings = LineageEngine.getMatings(animalId);
+            const events = [...ColonyData.events.values()].filter(e => e.animalId === animalId);
+
+            // Find siblings: animals that share a litter with this animal
+            const siblings = [];
+            for (const [lid, litter] of ColonyData.litters) {
+                if (litter.children.includes(animalId)) {
+                    litter.children.forEach(cid => {
+                        if (cid !== animalId && !siblings.includes(cid)) siblings.push(cid);
+                    });
+                }
+            }
+            
+            const html = `
+                <div class="detail-header">
+                    <div class="detail-icon ${animal.sex === 'M' ? 'male' : 'female'} ${animal.status === 'Dead' ? 'dead' : ''}"
+                         style="background: ${animal.sex === 'M' ? 'rgba(74,144,217,0.2)' : 'rgba(233,30,140,0.2)'}; 
+                                color: ${animal.status === 'Dead' ? 'var(--dead-color)' : (animal.sex === 'M' ? 'var(--male-color)' : 'var(--female-color)')}">
+                        ${animal.sex === 'M' ? '♂' : '♀'}
+                    </div>
+                    <div class="detail-title" style="flex:1">
+                        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+                            <input id="animalNameInput_${animalId}" type="text" value="${displayName}"
+                                style="background:transparent;border:none;border-bottom:1px dashed var(--text-secondary);font-size:1.1rem;font-weight:700;color:var(--text-primary);width:140px;padding:2px 4px;cursor:text"
+                                title="Click to rename"
+                                onblur="saveAnimalName('${animalId}', this.value)"
+                                onkeydown="if(event.key==='Enter'){this.blur()}">
+                            <span style="font-size:0.7rem;color:var(--text-secondary)" title="Internal ID">${animalId}</span>
+                        </div>
+                        <span style="color:var(--text-secondary)">${animal.sex === 'M' ? 'Male' : 'Female'} • ${animal.status}</span>
+                    </div>
+                </div>
+                
+                <div class="detail-stats">
+                    <div class="stat-card">
+                        <div class="label">Age</div>
+                        <div class="value"><span class="animal-age ${ageClass}" style="font-size:0.9rem">${age} days</span></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">DOB</div>
+                        <div class="value">${animal.dob}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Cage</div>
+                        <div class="value">${animal.cage}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Offspring</div>
+                        <div class="value">${offspring.length}</div>
+                    </div>
+                </div>
+                
+                ${parents.length > 0 ? `
+                <div class="detail-section">
+                    <h4>Parents</h4>
+                    <div class="relation-list">
+                        ${parents.map(p => {
+                            const parent = ColonyData.animals.get(p.id);
+                            return parent ? `
+                                <div class="relation-item" onclick="selectAnimal('${p.id}')">
+                                    <span>${parent.sex === 'M' ? '♂' : '♀'}</span>
+                                    <span>${p.id}</span>
+                                    <span class="relation-badge">${p.role}</span>
+                                    <span style="color:var(--text-secondary);font-size:0.8rem">Cage ${parent.cage}</span>
+                                </div>
+                            ` : '';
+                        }).join('')}
+                    </div>
+                </div>
+                ` : ''}
+
+                ${siblings.length > 0 ? `
+                <div class="detail-section">
+                    <h4>Litter Siblings (${siblings.length})</h4>
+                    <div class="relation-list">
+                        ${siblings.map(sid => {
+                            const sib = ColonyData.animals.get(sid);
+                            return sib ? `
+                                <div class="relation-item" onclick="selectAnimal('${sid}')">
+                                    <span>${sib.sex === 'M' ? '♂' : '♀'}</span>
+                                    <span>${sid}</span>
+                                    <span style="color:var(--text-secondary);font-size:0.8rem">Cage ${sib.cage}</span>
+                                </div>
+                            ` : '';
+                        }).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                
+                ${mates.length > 0 ? `
+                <div class="detail-section">
+                    <h4>Mates</h4>
+                    <div class="relation-list">
+                        ${mates.map(mid => {
+                            const mate = ColonyData.animals.get(mid);
+                            return mate ? `
+                                <div class="relation-item" onclick="selectAnimal('${mid}')">
+                                    <span>${mate.sex === 'M' ? '♂' : '♀'}</span>
+                                    <span>${mid}</span>
+                                    <span style="color:var(--text-secondary);font-size:0.8rem">Cage ${mate.cage}</span>
+                                </div>
+                            ` : '';
+                        }).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                
+                ${offspring.length > 0 ? `
+                <div class="detail-section">
+                    <h4>Direct Offspring (${offspring.length})</h4>
+                    <div class="relation-list">
+                        ${offspring.slice(0, 10).map(oid => {
+                            const child = ColonyData.animals.get(oid);
+                            return child ? `
+                                <div class="relation-item" onclick="selectAnimal('${oid}')">
+                                    <span>${child.sex === 'M' ? '♂' : '♀'}</span>
+                                    <span>${oid}</span>
+                                    <span style="color:var(--text-secondary);font-size:0.8rem">Cage ${child.cage}</span>
+                                </div>
+                            ` : '';
+                        }).join('')}
+                        ${offspring.length > 10 ? `<div style="color:var(--text-secondary);font-size:0.85rem;padding:5px">... and ${offspring.length - 10} more</div>` : ''}
+                    </div>
+                </div>
+                ` : ''}
+                
+                ${matings.length > 0 ? `
+                <div class="detail-section">
+                    <h4>Matings</h4>
+                    <div class="relation-list">
+                        ${matings.map(m => `
+                            <div class="relation-item" onclick="selectMating('${m.id}')" style="flex-wrap:wrap;gap:6px">
+                                <span>🔗</span>
+                                <span style="font-weight:600">${m.id}</span>
+                                <span class="relation-badge">${m.endDate ? 'Ended' : 'Active'}</span>
+                                <div style="width:100%;font-size:0.78rem;color:var(--text-secondary);padding-left:20px">
+                                    ${m.startDate} → ${m.endDate || 'ongoing'} ${m.cage ? `• Cage ${m.cage}` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                
+                ${events.length > 0 ? `
+                <div class="detail-section">
+                    <h4>Events</h4>
+                    <div class="relation-list">
+                        ${events.map(e => `
+                            <div class="relation-item" onclick="selectEventFromTimeline('${e.id}')" style="flex-wrap:wrap;gap:6px">
+                                <span>📅</span>
+                                <span style="font-weight:600">${e.type}</span>
+                                <span class="relation-badge">${e.date}</span>
+                                ${e.comments ? `<div style="width:100%;font-size:0.78rem;color:var(--text-secondary);padding-left:20px">${e.comments}</div>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                
+                ${animal.comments ? `
+                <div class="detail-section">
+                    <h4>Comments</h4>
+                    <p style="color:var(--text-secondary);font-size:0.9rem">${animal.comments}</p>
+                </div>
+                ` : ''}
+                
+                <div style="margin-top:20px;display:flex;gap:10px">
+                    <button class="btn btn-secondary btn-sm" onclick="openEditAnimalModal('${animalId}')">✏️ Edit</button>
+                    <button class="btn btn-secondary btn-sm" onclick="openModal('addEvent', '${animalId}')">📅 Add Event</button>
+                    <button class="btn btn-danger btn-sm" onclick="confirmDeleteAnimal('${animalId}')">🗑️ Delete</button>
+                </div>
+            `;
+            
+            document.getElementById('detailContent').innerHTML = html;
+        }
+
+        // ==================== TIMELINE VISUALIZATION ====================
+        function renderTimeline() {
+            const svg = document.getElementById('timelineSvg');
+            const container = document.getElementById('timelineContainer');
+            
+            const animals = [...ColonyData.animals.values()];
+            if (animals.length === 0) {
+                svg.innerHTML = `
+                    <text x="50%" y="50%" text-anchor="middle" fill="#666" font-size="16">
+                        No animals yet. Add your first animal to see the timeline.
+                    </text>
+                `;
+                return;
+            }
+            
+            // Calculate date range
+            const dates = animals.map(a => new Date(a.dob));
+            const minDate = new Date(Math.min(...dates));
+            const maxDate = new Date();
+            
+            // Add padding to dates
+            minDate.setDate(minDate.getDate() - 7);
+            maxDate.setDate(maxDate.getDate() + 30);
+            
+            const dayRange = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24));
+            
+            // Dimensions
+            const padding = { top: 60, right: 40, bottom: 40, left: 100 };
+            const animalSpacing = 60;
+            const dayHeight = 3 * timelineZoom;
+            
+            const width = padding.left + padding.right + animals.length * animalSpacing;
+            const height = padding.top + padding.bottom + dayRange * dayHeight;
+            
+            svg.setAttribute('width', width);
+            svg.setAttribute('height', height);
+            svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            
+            // Get related animals for highlighting
+            const relatedIds = selectedAnimalId ? 
+                new Set([selectedAnimalId, ...LineageEngine.getRelatedAnimals(selectedAnimalId)]) : 
+                null;
+            
+            // Sort animals by DOB
+            animals.sort((a, b) => new Date(a.dob) - new Date(b.dob));
+            
+            // Create position map
+            const animalPositions = new Map();
+            animals.forEach((animal, index) => {
+                animalPositions.set(animal.id, {
+                    x: padding.left + index * animalSpacing,
+                    startY: padding.top + dateToY(new Date(animal.dob), minDate, dayHeight),
+                    endY: animal.status === 'Dead' ? 
+                        padding.top + dateToY(getDeathDate(animal.id) || maxDate, minDate, dayHeight) :
+                        padding.top + dateToY(maxDate, minDate, dayHeight)
+                });
+            });
+            
+            let svgContent = '';
+            
+            // Draw time axis
+            svgContent += `<g class="time-axis">`;
+            const monthStart = new Date(minDate);
+            monthStart.setDate(1);
+            while (monthStart < maxDate) {
+                const y = padding.top + dateToY(monthStart, minDate, dayHeight);
+                const label = monthStart.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                svgContent += `
+                    <line x1="${padding.left - 10}" y1="${y}" x2="${width - padding.right}" y2="${y}" 
+                          stroke="#2d3a4f" stroke-width="1" stroke-dasharray="5,5"/>
+                    <text x="${padding.left - 15}" y="${y + 4}" text-anchor="end" fill="#666" font-size="11">${label}</text>
+                `;
+                monthStart.setMonth(monthStart.getMonth() + 1);
+            }
+            svgContent += `</g>`;
+            
+            // Draw mating connections — arc at top, then vertical line down to litter birth date
+            svgContent += `<g class="matings">`;
+            for (const [id, mating] of ColonyData.matings) {
+                const malePos = animalPositions.get(mating.maleId);
+                if (!malePos) continue;
+                
+                const matingStartY = padding.top + dateToY(new Date(mating.startDate), minDate, dayHeight);
+                const matingEndY = mating.endDate ? 
+                    padding.top + dateToY(new Date(mating.endDate), minDate, dayHeight) :
+                    padding.top + dateToY(maxDate, minDate, dayHeight);
+                
+                // Find litter for this mating (if any)
+                const litter = [...ColonyData.litters.values()].find(l => l.matingId === id);
+                const isDimmed = relatedIds && !relatedIds.has(mating.maleId);
+                
+                mating.femaleIds.forEach(fid => {
+                    const femalePos = animalPositions.get(fid);
+                    if (!femalePos) return;
+                    
+                    const dimmed = isDimmed && !relatedIds.has(fid);
+                    const midX = (malePos.x + femalePos.x) / 2;
+
+                    // Top arc connecting the two animals at mating start
+                    svgContent += `
+                        <path d="M ${malePos.x} ${matingStartY} Q ${midX} ${matingStartY - 22} ${femalePos.x} ${matingStartY}"
+                              class="mating-connector ${dimmed ? 'dimmed' : ''}" />
+                    `;
+
+                    // Vertical dashed line from mating start down to litter birth (or end) along midpoint
+                    if (litter && !litter.matingFailure) {
+                        const litterY = padding.top + dateToY(new Date(litter.dob), minDate, dayHeight);
+                        svgContent += `
+                            <line x1="${midX}" y1="${matingStartY}" x2="${midX}" y2="${litterY}"
+                                  stroke="${dimmed ? '#4ecca3' : '#4ecca3'}" stroke-width="1.5"
+                                  stroke-dasharray="4,3" opacity="${dimmed ? '0.15' : '0.6'}" />
+                        `;
+                    } else if (litter && litter.matingFailure) {
+                        // Mating failure — short stub with X
+                        const failY = matingStartY + (matingEndY - matingStartY) * 0.4;
+                        svgContent += `
+                            <line x1="${midX}" y1="${matingStartY}" x2="${midX}" y2="${failY}"
+                                  stroke="#ff6b6b" stroke-width="1.5" stroke-dasharray="3,3" opacity="${dimmed ? '0.15' : '0.7'}" />
+                            <text x="${midX}" y="${failY + 4}" text-anchor="middle" fill="#ff6b6b" font-size="11" opacity="${dimmed ? '0.15' : '1'}">✕</text>
+                        `;
+                    }
+                });
+            }
+            svgContent += `</g>`;
+            
+            // Draw litter connections and markers
+            svgContent += `<g class="litters">`;
+            for (const [id, litter] of ColonyData.litters) {
+                const mating = ColonyData.matings.get(litter.matingId);
+                if (!mating) continue;
+                if (litter.matingFailure) continue; // failure marker drawn in matings group
+
+                const litterY = padding.top + dateToY(new Date(litter.dob), minDate, dayHeight);
+                const fatherPos = animalPositions.get(mating.maleId);
+                const motherPos = animalPositions.get(litter.motherId || mating.femaleIds[0]);
+                if (!fatherPos || !motherPos) continue;
+                
+                const isDimmed = relatedIds && !relatedIds.has(mating.maleId) && !relatedIds.has(litter.motherId || mating.femaleIds[0]);
+                const midX = (fatherPos.x + motherPos.x) / 2;
+                const dimOpacity = isDimmed ? '0.15' : '1';
+                const litterColor = litter.allDead ? 'var(--error)' : '#ffd93d';
+
+                // Diamond marker at litter birth point on the midX line
+                const d = 7;
+                svgContent += `
+                    <g style="opacity:${dimOpacity}" onclick="selectLitter('${litter.id}')" style="cursor:pointer">
+                        <polygon points="${midX},${litterY-d} ${midX+d},${litterY} ${midX},${litterY+d} ${midX-d},${litterY}"
+                                 fill="${litterColor}" stroke="var(--bg-primary)" stroke-width="1.5"/>
+                        ${litter.allDead ? `<text x="${midX}" y="${litterY+4}" text-anchor="middle" fill="white" font-size="8">☠</text>` : ''}
+                    </g>
+                `;
+
+                // Lines from diamond to each child
+                litter.children.forEach(childId => {
+                    const childPos = animalPositions.get(childId);
+                    if (!childPos) return;
+                    const dimmed = isDimmed && !relatedIds.has(childId);
+                    svgContent += `
+                        <path d="M ${midX} ${litterY} L ${childPos.x} ${childPos.startY}"
+                              class="litter-line ${dimmed ? 'dimmed' : ''}" 
+                              stroke="${litter.allDead ? 'var(--error)' : '#ffd93d'}" />
+                    `;
+                });
+            }
+            svgContent += `</g>`;
+            
+            // Draw animal life lines and nodes
+            svgContent += `<g class="animals">`;
+            animals.forEach((animal, index) => {
+                const pos = animalPositions.get(animal.id);
+                const isDead = animal.status === 'Dead';
+                const isSelected = animal.id === selectedAnimalId;
+                const isDimmed = relatedIds && !relatedIds.has(animal.id);
+                
+                // Life line
+                svgContent += `
+                    <line x1="${pos.x}" y1="${pos.startY}" x2="${pos.x}" y2="${pos.endY}"
+                          class="timeline-line ${animal.sex === 'M' ? 'male' : 'female'} ${isDead ? 'dead' : ''} ${isDimmed ? 'dimmed' : ''} ${isSelected ? 'highlighted' : ''}"
+                          style="stroke: ${isDead ? 'var(--dead-color)' : (animal.sex === 'M' ? 'var(--male-color)' : 'var(--female-color)')}" />
+                `;
+                
+                // Birth node
+                const ageClass = getAgeClass(calculateAge(animal.dob, animal.id));
+                svgContent += `
+                    <g class="animal-node" onclick="selectAnimal('${animal.id}')" style="opacity: ${isDimmed ? '0.15' : '1'}">
+                        <circle cx="${pos.x}" cy="${pos.startY}" r="${isSelected ? 12 : 10}" 
+                                fill="${isDead ? 'var(--dead-color)' : (animal.sex === 'M' ? 'var(--male-color)' : 'var(--female-color)')}"
+                                stroke="${isSelected ? 'var(--accent)' : 'var(--bg-primary)'}" stroke-width="2" class="node-circle"/>
+                        <text x="${pos.x}" y="${pos.startY + 4}" text-anchor="middle" fill="white" font-size="10" font-weight="bold">
+                            ${animal.sex === 'M' ? '♂' : '♀'}
+                        </text>
+                        <text x="${pos.x}" y="${padding.top - 25}" text-anchor="middle" fill="var(--text-primary)" font-size="11" font-weight="600">
+                            ${getAnimalName(animal.id)}
+                        </text>
+                        <text x="${pos.x}" y="${padding.top - 10}" text-anchor="middle" fill="var(--text-secondary)" font-size="9">
+                            ${animal.name ? animal.id : animal.cage}
+                        </text>
+                    </g>
+                `;
+                
+                // Death marker
+                if (isDead) {
+                    svgContent += `
+                        <g class="event-marker" style="opacity: ${isDimmed ? '0.15' : '1'}">
+                            <circle cx="${pos.x}" cy="${pos.endY}" r="8" fill="var(--error)"/>
+                            <text x="${pos.x}" y="${pos.endY + 4}" text-anchor="middle" fill="white" font-size="10">✕</text>
+                        </g>
+                    `;
+                }
+            });
+            svgContent += `</g>`;
+            
+            // Draw events
+            svgContent += `<g class="events">`;
+            for (const [id, event] of ColonyData.events) {
+                if (event.type === 'Death') continue; // Already drawn
+                
+                const pos = animalPositions.get(event.animalId);
+                if (!pos) continue;
+                
+                const eventY = padding.top + dateToY(new Date(event.date), minDate, dayHeight);
+                const isDimmed = relatedIds && !relatedIds.has(event.animalId);
+                
+                const eventColors = {
+                    'Weaning': '#3498db',
+                    'Separation': '#9b59b6',
+                    'Transfer': '#e67e22',
+                    'Health check': '#2ecc71',
+                    'Custom': '#95a5a6'
+                };
+                
+                const color = eventColors[event.type] || '#95a5a6';
+                
+                svgContent += `
+                    <g class="event-marker" style="opacity: ${isDimmed ? '0.15' : '1'}" onclick="selectEventFromTimeline('${event.id}')">
+                        <circle class="event-dot" cx="${pos.x}" cy="${eventY}" r="6" fill="${color}"/>
+                        <circle class="event-hit" cx="${pos.x}" cy="${eventY}" r="14"/>
+                    </g>
+                `;
+            }
+            svgContent += `</g>`;
+            
+            svg.innerHTML = svgContent;
+        }
+
+        function dateToY(date, minDate, dayHeight) {
+            const days = Math.ceil((date - minDate) / (1000 * 60 * 60 * 24));
+            return days * dayHeight;
+        }
+
+        function getDeathDate(animalId) {
+            for (const [id, event] of ColonyData.events) {
+                if (event.animalId === animalId && event.type === 'Death') {
+                    return new Date(event.date);
+                }
+            }
+            return null;
+        }
+
+        function zoomTimeline(factor) {
+            timelineZoom *= factor;
+            timelineZoom = Math.max(0.5, Math.min(3, timelineZoom));
+            renderTimeline();
+        }
+
+        function resetTimelineView() {
+            timelineZoom = 1;
+            renderTimeline();
+        }
+
+        function selectEventFromTimeline(eventId) {
+            selectedEventId = eventId;
+            selectedMatingId = null;
+            selectedLitterId = null;
+            selectedAnimalId = null;
+            renderAnimalList();
+            renderMatingList();
+            renderLitterList();
+            renderEventList();
+            showEventDetail(eventId);
+        }
+
+        // ==================== MODALS ====================
+        function openModal(type, extraData = null) {
+            const overlay = document.getElementById('modalOverlay');
+            const content = document.getElementById('modalContent');
+            
+            let html = '';
+            
+            switch (type) {
+                case 'addAnimal':
+                    html = renderAddAnimalModal();
+                    break;
+                case 'addMating':
+                    html = renderAddMatingModal();
+                    break;
+                case 'addLitter':
+                    html = renderAddLitterModal();
+                    break;
+                case 'addEvent':
+                    html = renderAddEventModal(extraData);
+                    break;
+            }
+            
+            content.innerHTML = html;
+            overlay.classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('active');
+        }
+
+        function renderAddAnimalModal() {
+            const nextId = getNextId('animal');
+            const males = [...ColonyData.animals.values()].filter(a => a.sex === 'M' && a.status !== 'Dead');
+            const females = [...ColonyData.animals.values()].filter(a => a.sex === 'F' && a.status !== 'Dead');
+            
+            return `
+                <div class="modal-header">
+                    <h2>➕ Add New Animal</h2>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <form id="addAnimalForm" onsubmit="submitAddAnimal(event)">
+                        <div class="form-group">
+                            <label>Animal ID</label>
+                            <input type="text" name="id" value="${nextId}" required>
+                            <div class="form-error" id="idError"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Display Name <span style="color:var(--text-secondary);font-size:0.8rem">(optional — shown instead of ID)</span></label>
+                            <input type="text" name="name" placeholder="e.g. Alpha, Mouse-7...">
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Sex</label>
+                                <select name="sex" required>
+                                    <option value="M">♂ Male</option>
+                                    <option value="F">♀ Female</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Date of Birth</label>
+                                <input type="date" name="dob" value="${new Date().toISOString().split('T')[0]}" required>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Cage Number</label>
+                                <input type="text" name="cage" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Status</label>
+                                <select name="status">
+                                    <option value="Active">Active</option>
+                                    <option value="Separated">Separated</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Father</label>
+                                <select name="fatherId">
+                                    <option value="unknown">Unknown</option>
+                                    ${males.map(m => `<option value="${m.id}">${m.id}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Mother</label>
+                                <select name="motherId">
+                                    <option value="unknown">Unknown</option>
+                                    ${females.map(f => `<option value="${f.id}">${f.id}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Comments</label>
+                            <textarea name="comments" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="document.getElementById('addAnimalForm').requestSubmit()">Add Animal</button>
+                </div>
+            `;
+        }
+
+        function submitAddAnimal(event) {
+            event.preventDefault();
+            const form = event.target;
+            const nameVal = (form.name?.value || '').trim();
+
+            // Check name uniqueness before adding
+            if (nameVal && !isNameUnique(nameVal)) {
+                showToast(`Name "${nameVal}" is already used by another animal`, 'error');
+                return;
+            }
+
+            const data = {
+                id: form.id.value.trim(),
+                sex: form.sex.value,
+                dob: form.dob.value,
+                cage: form.cage.value.trim(),
+                status: form.status.value,
+                fatherId: form.fatherId.value,
+                motherId: form.motherId.value,
+                comments: form.comments.value.trim(),
+                name: nameVal
+            };
+            
+            const result = addAnimal(data);
+            if (result.success) {
+                closeModal();
+                showToast(`Animal ${data.id}${nameVal ? ' ("' + nameVal + '")' : ''} added`);
+                const num = parseInt(data.id.split('-')[1]);
+                if (num >= ColonyData.counters.animal) {
+                    ColonyData.counters.animal = num;
+                }
+            } else {
+                result.errors.forEach(err => showToast(err, 'error'));
+            }
+        }
+
+        function renderAddMatingModal() {
+            const nextId = getNextId('mating');
+            const males = [...ColonyData.animals.values()].filter(a => a.sex === 'M' && a.status === 'Active');
+            const females = [...ColonyData.animals.values()].filter(a => a.sex === 'F' && a.status === 'Active');
+            
+            return `
+                <div class="modal-header">
+                    <h2>🔗 New Mating</h2>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <form id="addMatingForm" onsubmit="submitAddMating(event)">
+                        <div class="form-group">
+                            <label>Mating ID</label>
+                            <input type="text" name="id" value="${nextId}" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Male</label>
+                            <select name="maleId" required>
+                                <option value="">Select male...</option>
+                                ${males.map(m => `<option value="${m.id}">${m.id} (Cage: ${m.cage})</option>`).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Females (select one or more)</label>
+                            <div class="checkbox-group">
+                                ${females.map(f => `
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="femaleIds" value="${f.id}">
+                                        ${f.id}
+                                    </label>
+                                `).join('')}
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Start Date</label>
+                                <input type="date" name="startDate" value="${new Date().toISOString().split('T')[0]}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>End Date (optional)</label>
+                                <input type="date" name="endDate">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Cage</label>
+                            <input type="text" name="cage">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Comments</label>
+                            <textarea name="comments" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="document.getElementById('addMatingForm').requestSubmit()">Create Mating</button>
+                </div>
+            `;
+        }
+
+        function submitAddMating(event) {
+            event.preventDefault();
+            const form = event.target;
+            const femaleCheckboxes = form.querySelectorAll('input[name="femaleIds"]:checked');
+            
+            const data = {
+                id: form.id.value.trim(),
+                maleId: form.maleId.value,
+                femaleIds: [...femaleCheckboxes].map(cb => cb.value),
+                startDate: form.startDate.value,
+                endDate: form.endDate.value || null,
+                cage: form.cage.value.trim(),
+                comments: form.comments.value.trim()
+            };
+            
+            const result = addMating(data);
+            if (result.success) {
+                closeModal();
+                showToast(`Mating ${data.id} created successfully`);
+                
+                const num = parseInt(data.id.split('-')[1]);
+                if (num >= ColonyData.counters.mating) {
+                    ColonyData.counters.mating = num;
+                }
+            } else {
+                result.errors.forEach(err => showToast(err, 'error'));
+            }
+        }
+
+        function renderAddLitterModal() {
+            const nextId = getNextId('litter');
+            const activeMatings = [...ColonyData.matings.values()];
+            const usedMatingIds = new Set([...ColonyData.litters.values()].map(l => l.matingId));
+            
+            return `
+                <div class="modal-header">
+                    <h2>🐣 Record Litter</h2>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <!-- STEP 1: Basic info + counts -->
+                    <div id="litterStep1">
+                        <div style="font-size:0.8rem;color:var(--accent);margin-bottom:12px;font-weight:600">Step 1 of 2 — Basic Information</div>
+                        <div class="form-group">
+                            <label>Litter ID</label>
+                            <input type="text" id="lf_id" value="${nextId}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Mating</label>
+                            <select id="lf_matingId" required onchange="onLitterMatingChange(this.value)">
+                                <option value="">Select mating...</option>
+                                ${activeMatings.map(m => {
+                                    const hasLitter = usedMatingIds.has(m.id);
+                                    return `<option value="${m.id}" ${hasLitter ? 'disabled' : ''}>${m.id} (${m.maleId} × ${m.femaleIds.join(', ')})${hasLitter ? ' — litter exists' : ''}</option>`;
+                                }).join('')}
+                            </select>
+                            <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:3px">⚠️ Each mating can only produce one litter.</div>
+                        </div>
+                        <div id="lf_motherGroup" style="display:none" class="form-group">
+                            <label>Mother (if multiple females)</label>
+                            <select id="lf_motherId"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Date of Birth</label>
+                            <input type="date" id="lf_dob" value="${new Date().toISOString().split('T')[0]}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Cage (for offspring)</label>
+                            <input type="text" id="lf_cage" placeholder="e.g. C3">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>♂ Males</label>
+                                <input type="number" id="lf_maleCount" min="0" value="0" oninput="onLitterCountChange()">
+                            </div>
+                            <div class="form-group">
+                                <label>♀ Females</label>
+                                <input type="number" id="lf_femaleCount" min="0" value="0" oninput="onLitterCountChange()">
+                            </div>
+                        </div>
+                        <div style="background:var(--bg-card);border-radius:8px;padding:10px;text-align:center;margin-bottom:12px">
+                            <span style="font-size:0.8rem;color:var(--text-secondary)">Total pups: </span>
+                            <span id="lf_totalDisplay" style="font-size:1.2rem;font-weight:700;color:var(--accent)">0</span>
+                        </div>
+                        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px;background:var(--bg-card);border-radius:8px;margin-bottom:8px">
+                            <input type="checkbox" id="lf_allDead" onchange="onAllDeadChange()" style="width:auto;cursor:pointer">
+                            <span style="font-size:0.9rem">☠️ All pups born dead (stillbirth)</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px;background:var(--bg-card);border-radius:8px;margin-bottom:12px">
+                            <input type="checkbox" id="lf_matingFailure" onchange="onMatingFailureChange()" style="width:auto;cursor:pointer">
+                            <span style="font-size:0.9rem">🚫 Mating failure — female not pregnant, will be separated</span>
+                        </label>
+                        <div class="form-error" id="lf_stepError"></div>
+                        <div class="form-group">
+                            <label>Comments</label>
+                            <textarea id="lf_comments" rows="2"></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- STEP 2: Name pups -->
+                    <div id="litterStep2" style="display:none">
+                        <div style="font-size:0.8rem;color:var(--accent);margin-bottom:12px;font-weight:600">Step 2 of 2 — Name the Pups</div>
+                        <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px">Each pup gets a unique ID automatically. You can optionally give them a name. Sex is pre-filled but editable.</div>
+                        <div id="lf_pupList" style="display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto"></div>
+                    </div>
+                </div>
+                <div class="modal-footer" id="litterModalFooter">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-primary" id="litterNextBtn" onclick="onLitterNext()">Next →</button>
+                </div>
+            `;
+        }
+
+        function onLitterMatingChange(matingId) {
+            const mating = ColonyData.matings.get(matingId);
+            const motherGroup = document.getElementById('lf_motherGroup');
+            const motherSelect = document.getElementById('lf_motherId');
+            if (mating && mating.femaleIds.length > 1) {
+                motherGroup.style.display = 'block';
+                motherSelect.innerHTML = mating.femaleIds.map(fid => 
+                    `<option value="${fid}">${fid}${ColonyData.animals.get(fid) ? ' — Cage ' + ColonyData.animals.get(fid).cage : ''}</option>`
+                ).join('');
+            } else {
+                motherGroup.style.display = 'none';
+            }
+        }
+
+        function onLitterCountChange() {
+            const males = parseInt(document.getElementById('lf_maleCount').value) || 0;
+            const females = parseInt(document.getElementById('lf_femaleCount').value) || 0;
+            document.getElementById('lf_totalDisplay').textContent = males + females;
+        }
+
+        function onAllDeadChange() {
+            const allDead = document.getElementById('lf_allDead').checked;
+            if (allDead) {
+                const mf = document.getElementById('lf_matingFailure');
+                if (mf) mf.checked = false;
+            }
+            onLitterCountChange();
+        }
+
+        function onMatingFailureChange() {
+            const mf = document.getElementById('lf_matingFailure').checked;
+            if (mf) {
+                const ad = document.getElementById('lf_allDead');
+                if (ad) ad.checked = false;
+                // Hide counts section
+                document.getElementById('lf_maleCount').disabled = true;
+                document.getElementById('lf_femaleCount').disabled = true;
+            } else {
+                document.getElementById('lf_maleCount').disabled = false;
+                document.getElementById('lf_femaleCount').disabled = false;
+            }
+        }
+
+        function onLitterBack() {
+            document.getElementById('litterStep2').style.display = 'none';
+            document.getElementById('litterStep1').style.display = 'block';
+            document.getElementById('litterModalFooter').innerHTML = `
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" id="litterNextBtn" onclick="onLitterNext()">Next →</button>
+            `;
+        }
+
+        function onPupSexChange(sel) {
+            sel.style.color = sel.value === 'M' ? 'var(--male-color)' : 'var(--female-color)';
+        }
+
+        function onLitterNext() {
+            const allDead = document.getElementById('lf_allDead').checked;
+            const matingFailure = document.getElementById('lf_matingFailure')?.checked;
+            const id = document.getElementById('lf_id').value.trim();
+            const matingId = document.getElementById('lf_matingId').value;
+            const dob = document.getElementById('lf_dob').value;
+            const males = parseInt(document.getElementById('lf_maleCount').value) || 0;
+            const females = parseInt(document.getElementById('lf_femaleCount').value) || 0;
+            const total = males + females;
+            const errorEl = document.getElementById('lf_stepError');
+
+            if (!id) { errorEl.textContent = 'Litter ID is required'; return; }
+            if (!isIdUnique(id)) { errorEl.textContent = 'Litter ID already exists'; return; }
+            if (!matingId) { errorEl.textContent = 'Please select a mating'; return; }
+
+            // Mating failure path
+            if (matingFailure) {
+                submitLitterMatingFailure();
+                return;
+            }
+
+            if (!dob) { errorEl.textContent = 'Date of birth is required'; return; }
+            const mating = ColonyData.matings.get(matingId);
+            if (mating && new Date(dob) < new Date(mating.startDate)) {
+                errorEl.textContent = `Litter DOB cannot be before mating start date (${mating.startDate})`;
+                return;
+            }
+            if (total <= 0) { errorEl.textContent = 'Enter the number of pups (even if stillborn)'; return; }
+            errorEl.textContent = '';
+
+            // All dead → create ghost dead animals and submit
+            if (allDead) {
+                submitLitterAllDead();
+                return;
+            }
+
+            // Build step 2 pup list with user-defined IDs
+            document.getElementById('litterStep1').style.display = 'none';
+            document.getElementById('litterStep2').style.display = 'block';
+
+            const nextNum = ColonyData.counters.animal + 1;
+            const pupRows = [];
+            for (let i = 0; i < males; i++) {
+                const suggestId = `A-${String(nextNum + i).padStart(4,'0')}`;
+                pupRows.push({ sex: 'M', suggestId });
+            }
+            for (let i = 0; i < females; i++) {
+                const suggestId = `A-${String(nextNum + males + i).padStart(4,'0')}`;
+                pupRows.push({ sex: 'F', suggestId });
+            }
+
+            document.getElementById('lf_pupList').innerHTML = `
+                <div style="display:grid;grid-template-columns:68px 1fr 1fr;gap:6px;padding:0 2px 4px;font-size:0.72rem;color:var(--text-secondary);font-weight:600;text-transform:uppercase">
+                    <span>Sex</span><span>Animal ID ✱</span><span>Name (optional)</span>
+                </div>
+                ${pupRows.map((p, idx) => `
+                <div style="display:grid;grid-template-columns:68px 1fr 1fr;gap:6px;padding:7px 8px;background:var(--bg-card);border-radius:6px;align-items:center">
+                    <select data-pupidx="${idx}" class="pup-sex-select"
+                            style="padding:5px 3px;background:var(--bg-primary);color:${p.sex==='M'?'var(--male-color)':'var(--female-color)'};border:1px solid var(--border-color);border-radius:4px;font-size:0.82rem"
+                            onchange="onPupSexChange(this)">
+                        <option value="M" ${p.sex==='M'?'selected':''}>♂ M</option>
+                        <option value="F" ${p.sex==='F'?'selected':''}>♀ F</option>
+                    </select>
+                    <input type="text" data-pupidx="${idx}" class="pup-id-input"
+                           value="${p.suggestId}"
+                           placeholder="A-XXXX"
+                           style="padding:5px 7px;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:4px;font-size:0.82rem;font-family:monospace">
+                    <input type="text" data-pupidx="${idx}" class="pup-name-input"
+                           placeholder="e.g. Fluffy"
+                           style="padding:5px 7px;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:4px;font-size:0.82rem">
+                </div>`).join('')}
+                <div class="form-error" id="pupListError" style="margin-top:4px"></div>
+            `;
+
+            document.getElementById('litterModalFooter').innerHTML = `
+                <button class="btn btn-secondary" onclick="onLitterBack()">← Back</button>
+                <button class="btn btn-primary" onclick="submitLitterWithNames()">🐣 Save Litter</button>
+            `;
+        }
+
+        function submitLitterMatingFailure() {
+            const id = document.getElementById('lf_id').value.trim();
+            const matingId = document.getElementById('lf_matingId').value;
+            const dob = document.getElementById('lf_dob').value || new Date().toISOString().split('T')[0];
+            const comments = document.getElementById('lf_comments').value.trim();
+
+            const mating = ColonyData.matings.get(matingId);
+            let litterNum = 1;
+            for (const [lid, l] of ColonyData.litters) { if (l.matingId === matingId) litterNum++; }
+
+            const litter = {
+                id, matingId, dob, totalPups: 0, maleCount: 0, femaleCount: 0,
+                litterNumber: litterNum, children: [],
+                comments: comments || 'Mating failure — female not pregnant, separated',
+                matingFailure: true
+            };
+            ColonyData.litters.set(id, litter);
+            ColonyData.counters.litter = Math.max(ColonyData.counters.litter, parseInt(id.split('-')[1]));
+
+            // Auto-end the mating on this date
+            if (mating && !mating.endDate) mating.endDate = dob;
+
+            // Mark females as Separated
+            if (mating) {
+                mating.femaleIds.forEach(fid => {
+                    const fa = ColonyData.animals.get(fid);
+                    if (fa && fa.status === 'Active') fa.status = 'Separated';
+                });
+            }
+
+            updateUI();
+            closeModal();
+            showToast(`Mating failure recorded for ${matingId} — females marked Separated`);
+        }
+
+        function submitLitterAllDead() {
+            const id = document.getElementById('lf_id').value.trim();
+            const matingId = document.getElementById('lf_matingId').value;
+            const motherId = document.getElementById('lf_motherId')?.value || null;
+            const dob = document.getElementById('lf_dob').value;
+            const males = parseInt(document.getElementById('lf_maleCount').value) || 0;
+            const females = parseInt(document.getElementById('lf_femaleCount').value) || 0;
+            const cage = document.getElementById('lf_cage').value.trim();
+            const comments = document.getElementById('lf_comments').value.trim();
+            const total = males + females;
+            const mating = ColonyData.matings.get(matingId);
+
+            let litterNum = 1;
+            for (const [lid, l] of ColonyData.litters) { if (l.matingId === matingId) litterNum++; }
+
+            const litter = {
+                id, matingId, dob, totalPups: total, maleCount: males, femaleCount: females,
+                litterNumber: litterNum, children: [],
+                comments: comments || 'All pups born dead (stillbirth)',
+                allDead: true
+            };
+
+            // Create ghost dead animals (short lines ending 1 day after birth)
+            const deadDate = new Date(dob);
+            deadDate.setDate(deadDate.getDate() + 1);
+            const deadDateStr = deadDate.toISOString().split('T')[0];
+            const nextNum = ColonyData.counters.animal + 1;
+
+            for (let i = 0; i < males; i++) {
+                const ghostId = `A-${String(nextNum + i).padStart(4,'0')}`;
+                const ghost = {
+                    id: ghostId, name: '', sex: 'M', dob, cage: cage || mating?.cage || '',
+                    status: 'Dead', fatherId: mating?.maleId || null,
+                    motherId: motherId || mating?.femaleIds[0] || null,
+                    comments: `Stillborn — from litter ${id}`
+                };
+                ColonyData.animals.set(ghostId, ghost);
+                ColonyData.counters.animal++;
+                // Auto death event
+                const evId = generateId('event');
+                ColonyData.events.set(evId, { id: evId, animalId: ghostId, type: 'Death', date: deadDateStr, comments: 'Stillbirth' });
+                litter.children.push(ghostId);
+            }
+            for (let i = 0; i < females; i++) {
+                const ghostId = `A-${String(nextNum + males + i).padStart(4,'0')}`;
+                const ghost = {
+                    id: ghostId, name: '', sex: 'F', dob, cage: cage || mating?.cage || '',
+                    status: 'Dead', fatherId: mating?.maleId || null,
+                    motherId: motherId || mating?.femaleIds[0] || null,
+                    comments: `Stillborn — from litter ${id}`
+                };
+                ColonyData.animals.set(ghostId, ghost);
+                ColonyData.counters.animal++;
+                const evId = generateId('event');
+                ColonyData.events.set(evId, { id: evId, animalId: ghostId, type: 'Death', date: deadDateStr, comments: 'Stillbirth' });
+                litter.children.push(ghostId);
+            }
+
+            ColonyData.litters.set(id, litter);
+            ColonyData.counters.litter = Math.max(ColonyData.counters.litter, parseInt(id.split('-')[1]));
+            updateUI();
+            closeModal();
+            showToast(`Litter ${id} — ${total} stillborn pups added as dead animals`);
+        }
+
+        function submitLitterWithNames() {
+            const id = document.getElementById('lf_id').value.trim();
+            const matingId = document.getElementById('lf_matingId').value;
+            const motherId = document.getElementById('lf_motherId')?.value || null;
+            const dob = document.getElementById('lf_dob').value;
+            const cage = document.getElementById('lf_cage').value.trim();
+            const comments = document.getElementById('lf_comments').value.trim();
+            const mating = ColonyData.matings.get(matingId);
+            const errorEl = document.getElementById('pupListError');
+
+            const idInputs = document.querySelectorAll('.pup-id-input');
+            const sexSelects = document.querySelectorAll('.pup-sex-select');
+            const nameInputs = document.querySelectorAll('.pup-name-input');
+
+            // Validate all IDs and names
+            const usedIds = new Set();
+            const usedNames = new Set();
+            const pupDefs = [];
+            let valid = true;
+
+            for (let i = 0; i < idInputs.length; i++) {
+                const pupId = idInputs[i].value.trim();
+                const sex = sexSelects[i].value;
+                const name = nameInputs[i].value.trim();
+
+                if (!pupId) { errorEl.textContent = `Pup ${i+1}: Animal ID is required`; return; }
+                if (usedIds.has(pupId)) { errorEl.textContent = `Pup ${i+1}: ID "${pupId}" is duplicated in this list`; return; }
+                if (!isIdUnique(pupId)) { errorEl.textContent = `Pup ${i+1}: ID "${pupId}" already exists in the colony`; return; }
+                usedIds.add(pupId);
+
+                if (name) {
+                    if (usedNames.has(name.toLowerCase())) { errorEl.textContent = `Pup ${i+1}: Name "${name}" is duplicated in this list`; return; }
+                    if (!isNameUnique(name)) { errorEl.textContent = `Pup ${i+1}: Name "${name}" is already used in the colony`; return; }
+                    usedNames.add(name.toLowerCase());
+                }
+
+                // Highlight each ID input to give feedback
+                idInputs[i].style.borderColor = 'var(--accent)';
+                pupDefs.push({ id: pupId, sex, name });
+            }
+
+            let maleCount = 0, femaleCount = 0;
+            pupDefs.forEach(p => p.sex === 'M' ? maleCount++ : femaleCount++);
+            let litterNum = 1;
+            for (const [lid, l] of ColonyData.litters) { if (l.matingId === matingId) litterNum++; }
+
+            const litter = {
+                id, matingId, dob, totalPups: pupDefs.length, maleCount, femaleCount,
+                litterNumber: litterNum, children: [], comments
+            };
+
+            pupDefs.forEach(pup => {
+                // Update counter so future IDs don't conflict
+                const num = parseInt(pup.id.split('-')[1]);
+                if (!isNaN(num) && num > ColonyData.counters.animal) ColonyData.counters.animal = num;
+
+                const child = {
+                    id: pup.id, name: pup.name || '',
+                    sex: pup.sex, dob,
+                    cage: cage || mating?.cage || '',
+                    status: 'Active',
+                    fatherId: mating?.maleId || null,
+                    motherId: motherId || mating?.femaleIds[0] || null,
+                    comments: `From litter ${litter.id}`
+                };
+                ColonyData.animals.set(pup.id, child);
+                litter.children.push(pup.id);
+            });
+
+            ColonyData.litters.set(id, litter);
+            ColonyData.counters.litter = Math.max(ColonyData.counters.litter, parseInt(id.split('-')[1]));
+            updateUI();
+            closeModal();
+            showToast(`Litter ${id} recorded — ${pupDefs.length} pups`);
+        }
+
+        // Keep validatePupCounts for edit litter modal
+        function validatePupCounts() {
+            const form = document.getElementById('addLitterForm');
+            if (!form) return;
+            const total = parseInt(form.totalPups?.value) || 0;
+            const males = parseInt(form.maleCount?.value) || 0;
+            const females = parseInt(form.femaleCount?.value) || 0;
+            const error = document.getElementById('pupCountError');
+            if (error && total > 0 && males + females !== total) {
+                error.textContent = `Male (${males}) + Female (${females}) = ${males + females}, should equal ${total}`;
+            } else if (error) {
+                error.textContent = '';
+            }
+        }
+
+        function renderAddEventModal(preselectedAnimalId = null) {
+            const nextId = getNextId('event');
+            const preAnimal = preselectedAnimalId ? ColonyData.animals.get(preselectedAnimalId) : null;
+            
+            return `
+                <div class="modal-header">
+                    <h2>📅 Add Event</h2>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <form id="addEventForm" onsubmit="submitAddEvent(event)">
+                        <div class="form-group">
+                            <label>Event ID</label>
+                            <input type="text" name="id" value="${nextId}" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Animal</label>
+                            <select name="animalId" required onchange="updateEventDateMin(this.value)">
+                                <option value="">Select animal...</option>
+                                ${[...ColonyData.animals.values()].map(a => 
+                                    `<option value="${a.id}" ${a.id === preselectedAnimalId ? 'selected' : ''}>${a.id} (${a.sex === 'M' ? '♂' : '♀'} — Cage ${a.cage})</option>`
+                                ).join('')}
+                            </select>
+                            <div id="eventAnimalDobHint" style="font-size:0.78rem;color:var(--text-secondary);margin-top:4px">
+                                ${preAnimal ? `Born: ${preAnimal.dob} — event date must be on or after this date` : ''}
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Event Type</label>
+                                <select name="type" required>
+                                    <option value="Death">Death</option>
+                                    <option value="Weaning">Weaning</option>
+                                    <option value="Separation">Separation</option>
+                                    <option value="Transfer">Transfer</option>
+                                    <option value="Health check">Health check</option>
+                                    <option value="Custom">Custom</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Date</label>
+                                <input type="date" name="date" id="eventDateInput"
+                                       value="${new Date().toISOString().split('T')[0]}"
+                                       min="${preAnimal ? preAnimal.dob : ''}" required>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Comments</label>
+                            <textarea name="comments" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="document.getElementById('addEventForm').requestSubmit()">Add Event</button>
+                </div>
+            `;
+        }
+
+        function updateEventDateMin(animalId) {
+            const animal = ColonyData.animals.get(animalId);
+            const hint = document.getElementById('eventAnimalDobHint');
+            const dateInput = document.getElementById('eventDateInput');
+            if (animal) {
+                if (hint) hint.textContent = `Born: ${animal.dob} — event date must be on or after this date`;
+                if (dateInput) {
+                    dateInput.min = animal.dob;
+                    // If current date value is before dob, reset to dob
+                    if (dateInput.value && dateInput.value < animal.dob) {
+                        dateInput.value = animal.dob;
+                    }
+                }
+            } else {
+                if (hint) hint.textContent = '';
+                if (dateInput) dateInput.min = '';
+            }
+        }
+
+        function submitAddEvent(event) {
+            event.preventDefault();
+            const form = event.target;
+            
+            const data = {
+                id: form.id.value.trim(),
+                animalId: form.animalId.value,
+                type: form.type.value,
+                date: form.date.value,
+                comments: form.comments.value.trim()
+            };
+            
+            const result = addEvent(data);
+            if (result.success) {
+                closeModal();
+                showToast(`Event recorded for ${data.animalId}`);
+                
+                const num = parseInt(data.id.split('-')[1]);
+                if (num >= ColonyData.counters.event) {
+                    ColonyData.counters.event = num;
+                }
+            } else {
+                result.errors.forEach(err => showToast(err, 'error'));
+            }
+        }
+
+        function openEditAnimalModal(animalId) {
+            const animal = ColonyData.animals.get(animalId);
+            if (!animal) return;
+            const currentName = animal.name || '';
+            
+            const html = `
+                <div class="modal-header">
+                    <h2>✏️ Edit Animal ${animalId}</h2>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <form id="editAnimalForm" onsubmit="submitEditAnimal(event, '${animalId}')">
+                        <div class="form-group">
+                            <label>Name <span style="color:var(--text-secondary);font-size:0.8rem">(optional, must be globally unique)</span></label>
+                            <input type="text" name="name" value="${currentName}" placeholder="e.g. Alpha, Bob…">
+                            <div class="form-error" id="nameError"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Sex</label>
+                                <select name="sex" required>
+                                    <option value="M" ${animal.sex === 'M' ? 'selected' : ''}>♂ Male</option>
+                                    <option value="F" ${animal.sex === 'F' ? 'selected' : ''}>♀ Female</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Date of Birth</label>
+                                <input type="date" name="dob" value="${animal.dob}" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Cage Number</label>
+                                <input type="text" name="cage" value="${animal.cage}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Status</label>
+                                <select name="status">
+                                    <option value="Active" ${animal.status === 'Active' ? 'selected' : ''}>Active</option>
+                                    <option value="Separated" ${animal.status === 'Separated' ? 'selected' : ''}>Separated</option>
+                                    <option value="Dead" ${animal.status === 'Dead' ? 'selected' : ''}>Dead</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Comments</label>
+                            <textarea name="comments" rows="2">${animal.comments || ''}</textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="document.getElementById('editAnimalForm').requestSubmit()">Save Changes</button>
+                </div>
+            `;
+            
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function submitEditAnimal(event, animalId) {
+            event.preventDefault();
+            const form = event.target;
+            const nameVal = (form.name?.value || '').trim();
+
+            // Check name uniqueness
+            if (nameVal && !isNameUnique(nameVal, animalId)) {
+                const err = document.getElementById('nameError');
+                if (err) err.textContent = `Name "${nameVal}" is already used by another animal`;
+                return;
+            }
+
+            const data = {
+                sex: form.sex.value,
+                dob: form.dob.value,
+                cage: form.cage.value.trim(),
+                status: form.status.value,
+                comments: form.comments.value.trim()
+            };
+            
+            const result = updateAnimal(animalId, data);
+            if (result.success) {
+                // Apply name change directly
+                const animal = ColonyData.animals.get(animalId);
+                if (animal) animal.name = nameVal;
+                updateUI();
+                closeModal();
+                showToast(`Animal ${animalId}${nameVal ? ' ("' + nameVal + '")' : ''} updated`);
+            } else {
+                result.errors.forEach(err => showToast(err, 'error'));
+            }
+        }
+
+        function confirmDeleteAnimal(animalId) {
+            const check = Validator.canDeleteAnimal(animalId);
+            
+            const html = `
+                <div class="modal-header">
+                    <h2>⚠️ Confirm Delete</h2>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="confirm-dialog">
+                        <div class="icon">🗑️</div>
+                        ${check.allowed ? `
+                            <p>Are you sure you want to delete animal <strong>${animalId}</strong>?<br>This action cannot be undone.</p>
+                            <div class="confirm-actions">
+                                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                                <button class="btn btn-danger" onclick="executeDeleteAnimal('${animalId}')">Delete</button>
+                            </div>
+                        ` : `
+                            <p>Cannot delete animal <strong>${animalId}</strong>.<br><br>Reason: ${check.reason}</p>
+                            <div class="confirm-actions">
+                                <button class="btn btn-secondary" onclick="closeModal()">OK</button>
+                            </div>
+                        `}
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function executeDeleteAnimal(animalId) {
+            const result = deleteAnimal(animalId);
+            if (result.success) {
+                closeModal();
+                clearSelection();
+                showToast(`Animal ${animalId} deleted`);
+            } else {
+                result.errors.forEach(err => showToast(err, 'error'));
+            }
+        }
+
+        // ==================== EDIT MATING MODAL ====================
+        function openEditMatingModal(matingId) {
+            const m = ColonyData.matings.get(matingId);
+            if (!m) return;
+            const male = ColonyData.animals.get(m.maleId);
+            const html = `
+                <div class="modal-header">
+                    <h2>✏️ Edit Mating ${matingId}</h2>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div style="background:var(--bg-card);border-radius:8px;padding:10px;margin-bottom:15px;font-size:0.85rem">
+                        <div style="color:var(--text-secondary);margin-bottom:4px;font-size:0.75rem;text-transform:uppercase">Animals in this mating</div>
+                        <div style="color:var(--male-color)">♂ ${m.maleId}${male ? ` — Cage ${male.cage}` : ''}</div>
+                        ${m.femaleIds.map(fid => {
+                            const fa = ColonyData.animals.get(fid);
+                            return `<div style="color:var(--female-color)">♀ ${fid}${fa ? ` — Cage ${fa.cage}` : ''}</div>`;
+                        }).join('')}
+                    </div>
+                    <form id="editMatingForm" onsubmit="submitEditMating(event, '${matingId}')">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Start Date</label>
+                                <input type="date" name="startDate" value="${m.startDate}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>End Date (optional)</label>
+                                <input type="date" name="endDate" value="${m.endDate || ''}">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Cage</label>
+                            <input type="text" name="cage" value="${m.cage || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label>Comments</label>
+                            <textarea name="comments" rows="2">${m.comments || ''}</textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="document.getElementById('editMatingForm').requestSubmit()">Save Changes</button>
+                </div>
+            `;
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function submitEditMating(event, matingId) {
+            event.preventDefault();
+            const form = event.target;
+            const m = ColonyData.matings.get(matingId);
+            if (!m) return;
+            const endDate = form.endDate.value || null;
+            if (endDate && new Date(endDate) < new Date(form.startDate.value)) {
+                showToast('End date cannot be before start date', 'error');
+                return;
+            }
+            m.startDate = form.startDate.value;
+            m.endDate = endDate;
+            m.cage = form.cage.value.trim();
+            m.comments = form.comments.value.trim();
+            updateUI();
+            closeModal();
+            showMatingDetail(matingId);
+            showToast(`Mating ${matingId} updated`);
+        }
+
+        // ==================== EDIT LITTER MODAL ====================
+        function openEditLitterModal(litterId) {
+            const l = ColonyData.litters.get(litterId);
+            if (!l) return;
+            const mating = ColonyData.matings.get(l.matingId);
+            const html = `
+                <div class="modal-header">
+                    <h2>✏️ Edit Litter ${litterId}</h2>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    ${mating ? `
+                    <div style="background:var(--bg-card);border-radius:8px;padding:10px;margin-bottom:15px;font-size:0.85rem">
+                        <div style="color:var(--text-secondary);margin-bottom:4px;font-size:0.75rem;text-transform:uppercase">From mating ${l.matingId}</div>
+                        <div style="color:var(--male-color)">♂ ${mating.maleId}${ColonyData.animals.get(mating.maleId) ? ` — Cage ${ColonyData.animals.get(mating.maleId).cage}` : ''}</div>
+                        ${mating.femaleIds.map(fid => {
+                            const fa = ColonyData.animals.get(fid);
+                            return `<div style="color:var(--female-color)">♀ ${fid}${fa ? ` — Cage ${fa.cage}` : ''}</div>`;
+                        }).join('')}
+                    </div>` : ''}
+                    <form id="editLitterForm" onsubmit="submitEditLitter(event, '${litterId}')">
+                        <div class="form-group">
+                            <label>Date of Birth</label>
+                            <input type="date" name="dob" value="${l.dob}" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Total Pups</label>
+                                <input type="number" name="totalPups" min="1" value="${l.totalPups}" required oninput="validateEditPupCounts()">
+                            </div>
+                            <div class="form-group">
+                                <label>Cage (for offspring)</label>
+                                <input type="text" name="cage" value="${l.children.length > 0 ? (ColonyData.animals.get(l.children[0])?.cage || '') : ''}">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Male Count</label>
+                                <input type="number" name="maleCount" min="0" value="${l.maleCount}" required oninput="validateEditPupCounts()">
+                            </div>
+                            <div class="form-group">
+                                <label>Female Count</label>
+                                <input type="number" name="femaleCount" min="0" value="${l.femaleCount}" required oninput="validateEditPupCounts()">
+                            </div>
+                        </div>
+                        <div class="form-error" id="editPupCountError"></div>
+                        <div class="form-group">
+                            <label>Comments</label>
+                            <textarea name="comments" rows="2">${l.comments || ''}</textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="document.getElementById('editLitterForm').requestSubmit()">Save Changes</button>
+                </div>
+            `;
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function validateEditPupCounts() {
+            const form = document.getElementById('editLitterForm');
+            if (!form) return;
+            const total = parseInt(form.totalPups.value) || 0;
+            const males = parseInt(form.maleCount.value) || 0;
+            const females = parseInt(form.femaleCount.value) || 0;
+            const error = document.getElementById('editPupCountError');
+            if (total > 0 && males + females !== total) {
+                error.textContent = `Male (${males}) + Female (${females}) = ${males + females}, should equal ${total}`;
+            } else {
+                error.textContent = '';
+            }
+        }
+
+        function submitEditLitter(event, litterId) {
+            event.preventDefault();
+            const form = event.target;
+            const l = ColonyData.litters.get(litterId);
+            if (!l) return;
+            const total = parseInt(form.totalPups.value);
+            const males = parseInt(form.maleCount.value);
+            const females = parseInt(form.femaleCount.value);
+            if (males + females !== total) {
+                showToast('Male + Female count must equal total pups', 'error');
+                return;
+            }
+            l.dob = form.dob.value;
+            l.totalPups = total;
+            l.maleCount = males;
+            l.femaleCount = females;
+            l.comments = form.comments.value.trim();
+            updateUI();
+            closeModal();
+            showLitterDetail(litterId);
+            showToast(`Litter ${litterId} updated`);
+        }
+
+        // ==================== EDIT EVENT MODAL ====================
+        function openEditEventModal(eventId) {
+            const e = ColonyData.events.get(eventId);
+            if (!e) return;
+            const animal = ColonyData.animals.get(e.animalId);
+            const html = `
+                <div class="modal-header">
+                    <h2>✏️ Edit Event ${eventId}</h2>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    ${animal ? `
+                    <div style="background:var(--bg-card);border-radius:8px;padding:10px;margin-bottom:15px;font-size:0.85rem">
+                        <div style="color:var(--text-secondary);margin-bottom:4px;font-size:0.75rem;text-transform:uppercase">Animal</div>
+                        <div style="color:${animal.sex==='M'?'var(--male-color)':'var(--female-color)'}">${animal.sex==='M'?'♂':'♀'} ${e.animalId} — Cage ${animal.cage} — ${animal.status}</div>
+                    </div>` : ''}
+                    <form id="editEventForm" onsubmit="submitEditEvent(event, '${eventId}')">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Event Type</label>
+                                <select name="type" required>
+                                    <option value="Death" ${e.type==='Death'?'selected':''}>Death</option>
+                                    <option value="Weaning" ${e.type==='Weaning'?'selected':''}>Weaning</option>
+                                    <option value="Separation" ${e.type==='Separation'?'selected':''}>Separation</option>
+                                    <option value="Transfer" ${e.type==='Transfer'?'selected':''}>Transfer</option>
+                                    <option value="Health check" ${e.type==='Health check'?'selected':''}>Health check</option>
+                                    <option value="Custom" ${e.type==='Custom'?'selected':''}>Custom</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Date</label>
+                                <input type="date" name="date" value="${e.date}" min="${animal ? animal.dob : ''}" required>
+                                ${animal ? `<div style="font-size:0.78rem;color:var(--text-secondary);margin-top:3px">Born: ${animal.dob}</div>` : ''}
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Comments</label>
+                            <textarea name="comments" rows="2">${e.comments || ''}</textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="document.getElementById('editEventForm').requestSubmit()">Save Changes</button>
+                </div>
+            `;
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function submitEditEvent(event, eventId) {
+            event.preventDefault();
+            const form = event.target;
+            const e = ColonyData.events.get(eventId);
+            if (!e) return;
+            const errors = Validator.validateEvent({ ...e, type: form.type.value, date: form.date.value }, true);
+            if (errors.length > 0) {
+                errors.forEach(err => showToast(err, 'error'));
+                return;
+            }
+            e.type = form.type.value;
+            e.date = form.date.value;
+            e.comments = form.comments.value.trim();
+            // If type changed to Death, update animal status
+            if (e.type === 'Death') {
+                const animal = ColonyData.animals.get(e.animalId);
+                if (animal) animal.status = 'Dead';
+            }
+            updateUI();
+            closeModal();
+            showEventDetail(eventId);
+            showToast(`Event ${eventId} updated`);
+        }
+
+        // ==================== TOAST NOTIFICATIONS ====================
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // ==================== XML IMPORT/EXPORT ====================
+        function exportXML() {
+            let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<colony>\n\n';
+            
+            // Animals
+            xml += '  <animals>\n';
+            for (const [id, animal] of ColonyData.animals) {
+                xml += `    <animal id="${animal.id}" sex="${animal.sex}" dob="${animal.dob}" cage="${animal.cage}" status="${animal.status}"`;
+                if (animal.name) xml += ` name="${escapeXml(animal.name)}"`;
+                if (animal.fatherId) xml += ` fatherId="${animal.fatherId}"`;
+                if (animal.motherId) xml += ` motherId="${animal.motherId}"`;
+                if (animal.comments) {
+                    xml += `>\n      <comments>${escapeXml(animal.comments)}</comments>\n    </animal>\n`;
+                } else {
+                    xml += ' />\n';
+                }
+            }
+            xml += '  </animals>\n\n';
+            
+            // Matings
+            xml += '  <matings>\n';
+            for (const [id, mating] of ColonyData.matings) {
+                xml += `    <mating id="${mating.id}" male="${mating.maleId}" startDate="${mating.startDate}"`;
+                if (mating.endDate) xml += ` endDate="${mating.endDate}"`;
+                if (mating.cage) xml += ` cage="${mating.cage}"`;
+                xml += '>\n';
+                mating.femaleIds.forEach(fid => {
+                    xml += `      <female>${fid}</female>\n`;
+                });
+                if (mating.comments) {
+                    xml += `      <comments>${escapeXml(mating.comments)}</comments>\n`;
+                }
+                xml += '    </mating>\n';
+            }
+            xml += '  </matings>\n\n';
+            
+            // Litters
+            xml += '  <litters>\n';
+            for (const [id, litter] of ColonyData.litters) {
+                xml += `    <litter id="${litter.id}" mating="${litter.matingId}" dob="${litter.dob}" totalPups="${litter.totalPups}" maleCount="${litter.maleCount}" femaleCount="${litter.femaleCount}" litterNumber="${litter.litterNumber}"`;
+                if (litter.allDead) xml += ` allDead="true"`;
+                if (litter.matingFailure) xml += ` matingFailure="true"`;
+                xml += '>\n';
+                litter.children.forEach(cid => {
+                    xml += `      <child>${cid}</child>\n`;
+                });
+                if (litter.comments) {
+                    xml += `      <comments>${escapeXml(litter.comments)}</comments>\n`;
+                }
+                xml += '    </litter>\n';
+            }
+            xml += '  </litters>\n\n';
+            
+            // Events
+            xml += '  <events>\n';
+            for (const [id, event] of ColonyData.events) {
+                xml += `    <event id="${event.id}" animal="${event.animalId}" type="${event.type}" date="${event.date}"`;
+                if (event.comments) {
+                    xml += `>\n      <comments>${escapeXml(event.comments)}</comments>\n    </event>\n`;
+                } else {
+                    xml += ' />\n';
+                }
+            }
+            xml += '  </events>\n\n';
+            
+            xml += '</colony>';
+            
+            // Download
+            const blob = new Blob([xml], { type: 'application/xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `colony_export_${new Date().toISOString().split('T')[0]}.xml`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            showToast('Colony data exported successfully');
+        }
+
+        function escapeXml(str) {
+            return str.replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;')
+                      .replace(/'/g, '&apos;');
+        }
+
+        function importXML(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(e.target.result, 'text/xml');
+                    
+                    // Check for parse errors
+                    const parseError = xmlDoc.querySelector('parsererror');
+                    if (parseError) {
+                        throw new Error('Invalid XML format');
+                    }
+                    
+                    // Validate and import
+                    const errors = validateXMLImport(xmlDoc);
+                    if (errors.length > 0) {
+                        errors.forEach(err => showToast(err, 'error'));
+                        return;
+                    }
+                    
+                    // Clear existing data
+                    ColonyData.animals.clear();
+                    ColonyData.matings.clear();
+                    ColonyData.litters.clear();
+                    ColonyData.events.clear();
+                    ColonyData.counters = { animal: 0, mating: 0, litter: 0, event: 0 };
+                    
+                    // Import animals
+                    const animals = xmlDoc.querySelectorAll('animals > animal');
+                    animals.forEach(a => {
+                        const animal = {
+                            id: a.getAttribute('id'),
+                            name: a.getAttribute('name') || '',
+                            sex: a.getAttribute('sex'),
+                            dob: a.getAttribute('dob'),
+                            cage: a.getAttribute('cage'),
+                            status: a.getAttribute('status') || 'Active',
+                            fatherId: a.getAttribute('fatherId') || null,
+                            motherId: a.getAttribute('motherId') || null,
+                            comments: a.querySelector('comments')?.textContent || ''
+                        };
+                        ColonyData.animals.set(animal.id, animal);
+                        updateCounter('animal', animal.id);
+                    });
+                    
+                    // Import matings
+                    const matings = xmlDoc.querySelectorAll('matings > mating');
+                    matings.forEach(m => {
+                        const femaleEls = m.querySelectorAll('female');
+                        const mating = {
+                            id: m.getAttribute('id'),
+                            maleId: m.getAttribute('male'),
+                            femaleIds: [...femaleEls].map(f => f.textContent),
+                            startDate: m.getAttribute('startDate'),
+                            endDate: m.getAttribute('endDate') || null,
+                            cage: m.getAttribute('cage') || '',
+                            comments: m.querySelector('comments')?.textContent || ''
+                        };
+                        ColonyData.matings.set(mating.id, mating);
+                        updateCounter('mating', mating.id);
+                    });
+                    
+                    // Import litters
+                    const litters = xmlDoc.querySelectorAll('litters > litter');
+                    litters.forEach(l => {
+                        const childEls = l.querySelectorAll('child');
+                        const litter = {
+                            id: l.getAttribute('id'),
+                            matingId: l.getAttribute('mating'),
+                            dob: l.getAttribute('dob'),
+                            totalPups: parseInt(l.getAttribute('totalPups')) || 0,
+                            maleCount: parseInt(l.getAttribute('maleCount')) || 0,
+                            femaleCount: parseInt(l.getAttribute('femaleCount')) || 0,
+                            litterNumber: parseInt(l.getAttribute('litterNumber')) || 1,
+                            allDead: l.getAttribute('allDead') === 'true',
+                            matingFailure: l.getAttribute('matingFailure') === 'true',
+                            children: [...childEls].map(c => c.textContent),
+                            comments: l.querySelector('comments')?.textContent || ''
+                        };
+                        ColonyData.litters.set(litter.id, litter);
+                        updateCounter('litter', litter.id);
+                    });
+                    
+                    // Import events
+                    const events = xmlDoc.querySelectorAll('events > event');
+                    events.forEach(ev => {
+                        const event = {
+                            id: ev.getAttribute('id'),
+                            animalId: ev.getAttribute('animal'),
+                            type: ev.getAttribute('type'),
+                            date: ev.getAttribute('date'),
+                            comments: ev.querySelector('comments')?.textContent || ''
+                        };
+                        ColonyData.events.set(event.id, event);
+                        updateCounter('event', event.id);
+                    });
+                    
+                    updateUI();
+                    clearSelection();
+                    showToast(`Imported: ${ColonyData.animals.size} animals, ${ColonyData.matings.size} matings, ${ColonyData.litters.size} litters, ${ColonyData.events.size} events`);
+                    
+                } catch (err) {
+                    showToast(`Import failed: ${err.message}`, 'error');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function updateCounter(type, id) {
+            const num = parseInt(id.split('-')[1]);
+            if (num > ColonyData.counters[type]) {
+                ColonyData.counters[type] = num;
+            }
+        }
+
+        function validateXMLImport(xmlDoc) {
+            const errors = [];
+            const allIds = new Set();
+            
+            // Check for duplicate IDs
+            const checkId = (id, type) => {
+                if (allIds.has(id)) {
+                    errors.push(`Duplicate ID found: ${id}`);
+                }
+                allIds.add(id);
+            };
+            
+            xmlDoc.querySelectorAll('animals > animal').forEach(a => checkId(a.getAttribute('id'), 'animal'));
+            xmlDoc.querySelectorAll('matings > mating').forEach(m => checkId(m.getAttribute('id'), 'mating'));
+            xmlDoc.querySelectorAll('litters > litter').forEach(l => checkId(l.getAttribute('id'), 'litter'));
+            xmlDoc.querySelectorAll('events > event').forEach(e => checkId(e.getAttribute('id'), 'event'));
+            
+            // Validate references
+            const animalIds = new Set();
+            xmlDoc.querySelectorAll('animals > animal').forEach(a => animalIds.add(a.getAttribute('id')));
+            
+            xmlDoc.querySelectorAll('matings > mating').forEach(m => {
+                const maleId = m.getAttribute('male');
+                if (!animalIds.has(maleId)) {
+                    errors.push(`Mating ${m.getAttribute('id')} references unknown male: ${maleId}`);
+                }
+                m.querySelectorAll('female').forEach(f => {
+                    if (!animalIds.has(f.textContent)) {
+                        errors.push(`Mating ${m.getAttribute('id')} references unknown female: ${f.textContent}`);
+                    }
+                });
+            });
+            
+            const matingIds = new Set();
+            xmlDoc.querySelectorAll('matings > mating').forEach(m => matingIds.add(m.getAttribute('id')));
+            
+            xmlDoc.querySelectorAll('litters > litter').forEach(l => {
+                const matingId = l.getAttribute('mating');
+                if (!matingIds.has(matingId)) {
+                    errors.push(`Litter ${l.getAttribute('id')} references unknown mating: ${matingId}`);
+                }
+            });
+            
+            xmlDoc.querySelectorAll('events > event').forEach(e => {
+                const animalId = e.getAttribute('animal');
+                if (!animalIds.has(animalId)) {
+                    errors.push(`Event ${e.getAttribute('id')} references unknown animal: ${animalId}`);
+                }
+            });
+            
+            return errors;
+        }
+
+        // ==================== DEMO DATA ====================
+        function loadDemoData() {
+            // Add some demo animals
+            addAnimal({ id: 'A-0001', sex: 'M', dob: '2024-06-15', cage: 'C1', status: 'Active', comments: 'Founder male' });
+            addAnimal({ id: 'A-0002', sex: 'F', dob: '2024-06-20', cage: 'C1', status: 'Active', comments: 'Founder female' });
+            addAnimal({ id: 'A-0003', sex: 'F', dob: '2024-07-01', cage: 'C2', status: 'Active', comments: 'Second female' });
+            
+            // Add a mating
+            addMating({
+                id: 'M-0001',
+                maleId: 'A-0001',
+                femaleIds: ['A-0002'],
+                startDate: '2024-08-01',
+                cage: 'C1',
+                comments: 'First breeding pair'
+            });
+            
+            // Add a litter
+            addLitter({
+                id: 'L-0001',
+                matingId: 'M-0001',
+                dob: '2024-08-21',
+                totalPups: 6,
+                maleCount: 3,
+                femaleCount: 3,
+                cage: 'C1'
+            });
+            
+            // Add second mating
+            addMating({
+                id: 'M-0002',
+                maleId: 'A-0001',
+                femaleIds: ['A-0003'],
+                startDate: '2024-09-01',
+                cage: 'C2'
+            });
+            
+            // Add second litter
+            addLitter({
+                id: 'L-0002',
+                matingId: 'M-0002',
+                dob: '2024-09-22',
+                totalPups: 4,
+                maleCount: 2,
+                femaleCount: 2,
+                cage: 'C2'
+            });
+            
+            // Add some events
+            addEvent({
+                id: 'E-0001',
+                animalId: 'A-0004',
+                type: 'Weaning',
+                date: '2024-09-11',
+                comments: 'Weaned at 21 days'
+            });
+            
+            showToast('Demo data loaded');
+        }
+
+        // ==================== INITIALIZATION ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            updateUI();
+            
+            // Close modal on overlay click
+            document.getElementById('modalOverlay').addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) {
+                    closeModal();
+                }
+            });
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeModal();
+                }
+            });
+        });
+
+        // Load demo data on first run
+        if (ColonyData.animals.size === 0) {
+            loadDemoData();
+        }
+    </script>
+</body>
+</html>

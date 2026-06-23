@@ -47,7 +47,7 @@
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
-    position: sticky;
+    /* position: sticky; */
     top: 0;
     z-index: 20;
   }
@@ -450,7 +450,7 @@
 
 <!-- ===================== MAIN APP ===================== -->
 <header>
-  <h1>🐭 Mouse Colony Manager <span class="version-badge">v3.0</span></h1>
+  <h1>🐭 Colony Manager <span class="version-badge">v3.0</span></h1>
   <div class="toolbar">
     <button class="primary" onclick="addCage()">＋ Mating</button>
     <button onclick="exportJSON()">⬇ Export JSON</button>
@@ -797,7 +797,7 @@ function render() {
     scrollWrap.className = 'table-scroll';
     const tbl = document.createElement('table');
     tbl.innerHTML = `<thead><tr>
-      <th>Mice ID</th><th>DOB</th><th>Age</th><th>Ear Punch</th><th>Sex &nbsp &nbsp &nbsp &nbsp</th>
+      <th>Mice<br>ID</th><th>DOB</th><th>Age</th><th>Ear<br>Punch</th><th>Sex &nbsp &nbsp &nbsp &nbsp</th>
       <th>Weaning Date</th><th>Genotyping</th><th>Disposition</th><th>Disp. Date</th>
       <th>Alive</th><th>Notes</th><th></th></tr></thead>`;
     const tb = document.createElement('tbody');
@@ -1174,14 +1174,39 @@ function updateStats(){
 
 
   statsEl.innerHTML =
-    `<div class="stat"><b>${cages}</b><span>Matings</span></div>
-     <div class="stat clickable" onclick="setActiveFilterOn()"><b style="color:var(--ok)">${active}</b><span>Active M.</span></div>
-     <div class="stat"><b>${alive}</b><span>Alive</span></div>
-     <div class="stat"><b style="color:var(--female)">${f}</b><span>Female</span></div>
-     <div class="stat"><b style="color:var(--male)">${m}</b><span>Male</span></div>
-     <div class="stat clickable" onclick="setWeanFilterOn()"><b style="color:var(--warn)">${weanReady}</b><span>Wean Ready</span></div>
-     <div class="stat clickable" onclick="setSampleFilterPending()"><b style="color:var(--pending)">${pending}</b><span>Geno pending</span></div>
-     <div class="stat"><b>${total}</b><span>Total Yet</span></div>`;
+    `
+<div class="stat clickable" onclick="setActiveFilterOn()">
+      <b> ${active} / <span style="color:var(--ok)">${cages}</span>
+      </b>
+      <span>Active/Σ Matings</span>
+
+   </div>   
+
+   <div class="stat clickable" onclick="setWeanFilterOn()">
+      <b style="color:var(--warn)">${weanReady}</b>
+      <span>Weaning ⏳</span>
+   </div>
+
+   <div class="stat clickable" onclick="setSampleFilterPending()">
+      <b style="color:var(--pending)">${pending}</b>
+      <span>Geno ⏳</span>
+   </div>
+
+   <div class="stat">
+      <b>${alive}</b>
+      <span>
+        Alive <span style="color:var(--female)">♀ ${f}</span> | 
+        <span style="color:var(--male)">♂ ${m}</span>
+      </span>
+   </div>
+
+   <div class="stat">
+      <b>${total}</b>
+      <span>Total Yet</span>
+   </div>
+
+
+`;
 }
 
 function setWeanFilterOn(){ if(!filterWean) toggleWean(); }

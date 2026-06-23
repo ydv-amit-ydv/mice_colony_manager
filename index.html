@@ -797,8 +797,8 @@ function render() {
     scrollWrap.className = 'table-scroll';
     const tbl = document.createElement('table');
     tbl.innerHTML = `<thead><tr>
-      <th>Mouse ID</th><th>DOB</th><th>Age</th><th>Ear Punch</th><th>Sex</th>
-      <th>Weaning Date</th><th>Genotyping Status</th><th>Disposition</th><th>Disp. Date</th>
+      <th>Mice ID</th><th>DOB</th><th>Age</th><th>Ear Punch</th><th>Sex &nbsp &nbsp &nbsp &nbsp</th>
+      <th>Weaning Date</th><th>Genotyping</th><th>Disposition</th><th>Disp. Date</th>
       <th>Alive</th><th>Notes</th><th></th></tr></thead>`;
     const tb = document.createElement('tbody');
     const filtersOn = (q||filterWean||sampleFilter);
@@ -1305,24 +1305,77 @@ function clearAll(){
 }
 
 /* ---------- Auto-increment helpers ---------- */
-function highestNumericIdIn(mice){
-  let max = 0;
+/* ---------- Alphanumeric ID parsing ---------- */
+// Splits an ID into { prefix, num, width } where num is the trailing integer.
+// "R45" -> {prefix:"R", num:45, width:2}; "12" -> {prefix:"", num:12, width:2}
+// Returns null if there is no trailing numeric part.
+function parseId(id){
+  const m = strim(id).match(/^(.*?)(\d+)$/);
+  if(!m) return null;
+  return { prefix: m[1], num: parseInt(m[2], 10), width: m[2].length };
+}
+function formatId(prefix, num, width){
+  let digits = String(num);
+  if(digits.length < width) digits = digits.padStart(width, '0'); // keep zero-padding like R045
+  return prefix + digits;
+}
+
+// Highest trailing-numeric value among a set of mice, optionally restricted
+// to IDs sharing a given prefix. Returns { num, prefix, width } or null.
+function highestIdIn(mice, prefixFilter){
+  let best = null;
   mice.forEach(m=>{
-    const v = strim(m.mouseId);
-    const n = parseInt(v,10);
-    if(!isNaN(n) && String(n) === v && n>max) max=n;
+    const p = parseId(m.mouseId);
+    if(!p) return;
+    if(prefixFilter !== undefined && p.prefix !== prefixFilter) return;
+    if(!best || p.num > best.num) best = p;
   });
-  return max;
+  return best;
 }
+
 function nextMouseId(cage){
-  let base = cage ? highestNumericIdIn(cage.mice) : 0;
-  const globalMax = highestNumericIdIn(colony.flatMap(c=>c.mice));
-  if(globalMax > base) base = globalMax;
-  const taken = allMouseIds(null);
-  let candidate = base + 1;
-  while(taken.has(String(candidate).toLowerCase())) candidate++;
-  return String(candidate);
+  const allMice = colony.flatMap(c=>c.mice);
+  const taken = allMouseIds(null); // lowercased set of every existing ID
+
+  // 1) Derive a candidate from the LOCAL cage maximum.
+  const localBest = cage ? highestIdIn(cage.mice) : null;
+
+  let candidateBest;     // {prefix,num,width} we will increment from
+  if(localBest){
+    candidateBest = localBest;
+  } else {
+    // No numeric IDs in this cage yet. Try to follow the global numbering
+    // style if one exists, otherwise start at "1".
+    const globalBest = highestIdIn(allMice);
+    candidateBest = globalBest || { prefix:'', num:0, width:1 };
+  }
+
+  // 2) Build the next ID by incrementing the trailing number.
+  let next = formatId(candidateBest.prefix, candidateBest.num + 1, candidateBest.width);
+
+  // 3) If it clashes with any existing ID globally, warn and re-base on the
+  //    GLOBAL maximum for that same prefix, then advance past any collisions.
+  if(taken.has(next.toLowerCase())){
+    const globalBestSamePrefix = highestIdIn(allMice, candidateBest.prefix);
+    let base = globalBestSamePrefix ? globalBestSamePrefix.num : candidateBest.num;
+    let width = globalBestSamePrefix ? globalBestSamePrefix.width : candidateBest.width;
+    let n = base + 1;
+    next = formatId(candidateBest.prefix, n, width);
+    while(taken.has(next.toLowerCase())){
+      n++;
+      next = formatId(candidateBest.prefix, n, width);
+    }
+    alert(
+      'The next ID based on this mating ("' +
+      formatId(candidateBest.prefix, candidateBest.num + 1, candidateBest.width) +
+      '") already exists elsewhere in the colony.\n\n' +
+      'Assigned "' + next + '" instead (based on the global maximum). Adjust it if needed.'
+    );
+  }
+
+  return next;
 }
+
 function highestNumericPunchIn(mice){
   let max = 0;
   mice.forEach(m=>{
@@ -1626,7 +1679,7 @@ function formatPaste(){
     updateCursor();
   } catch(e){ /* invalid — leave as is */ }
 }
-function clearPaste(){
+function clearPaste(){c
   const area = document.getElementById('pasteArea');
   if(area) area.value = '';
   validatePaste();

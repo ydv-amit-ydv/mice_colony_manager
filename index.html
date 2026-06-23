@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mouse Colony Manager</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='[w3.org](http://www.w3.org/2000/svg)' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%AD%3C/text%3E%3C/svg%3E">
 <style>
   :root {
     --bg: #f5f6f8;
@@ -45,7 +46,17 @@
     top: 0;
     z-index: 20;
   }
-  header h1 { font-size: 18px; margin: 0; flex: 0 0 auto; }
+  header h1 { font-size: 18px; margin: 0; flex: 0 0 auto; display:flex; align-items:center; gap:8px; }
+  .version-badge {
+    font-size: 11px; font-weight: 700; color: var(--accent);
+    background: var(--accent-soft); border:1px solid #cdd9fb;
+    padding: 2px 8px; border-radius: 20px; letter-spacing:.03em;
+  }
+  .colony-name {
+    font-size: 14px; font-weight: 600; border: 1px solid var(--line);
+    border-radius: 7px; padding: 7px 11px; min-width: 220px;
+  }
+  .colony-name:focus { outline: none; border-color: var(--accent); }
   .toolbar { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
   button, .filebtn {
     border: 1px solid var(--line);
@@ -87,6 +98,13 @@
   .stat span { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
   .stat.clickable { cursor: pointer; }
   .stat.clickable:hover { outline: 2px solid var(--accent); }
+
+  .colony-bar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 14px;
+  }
+  .colony-bar label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 
   .lockbar {
     display: flex; align-items: center; gap: 10px;
@@ -134,7 +152,7 @@
     font: inherit;
   }
   .cage-head input:focus, .cage-head select:focus, td input:focus, td select:focus,
-  .lineage input:focus {
+  .lineage input:focus, .lineage select:focus {
     outline: none; border-color: var(--accent); background:#fff;
   }
   .cage-title { font-size: 16px; font-weight: 700; min-width: 110px; }
@@ -146,12 +164,18 @@
 
   /* Lineage pairing block */
   .lineage-wrap { display:flex; gap:18px; flex-wrap:wrap; padding:10px 16px; border-bottom:1px solid var(--line); background:#fcfdff; }
-  .lineage { border:1px solid var(--line); border-radius:10px; padding:8px 12px; min-width:260px; }
+  .lineage { border:1px solid var(--line); border-radius:10px; padding:8px 12px; min-width:300px; }
   .lineage h5 { margin:0 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
   .lineage.female h5 { color: var(--female); }
   .lineage.male h5 { color: var(--male); }
-  .lineage .row { display:flex; gap:10px; flex-wrap:wrap; }
-  .lineage .field input { border:1px solid var(--line); background:#fff; }
+  .lineage .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+  .lineage .field input, .lineage .field select { border:1px solid var(--line); background:#fff; }
+  .lineage .resolve { font-size:11px; margin-top:6px; }
+  .lineage .resolve.found { color: var(--ok); }
+  .lineage .resolve.notfound { color: var(--warn); }
+  .lineage-mode { display:flex; flex-direction:column; gap:1px; }
+  .lineage-mode label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
+  .lineage-mode select { min-width:130px; }
 
   .status-badge { font-size:11px; padding:3px 9px; border-radius:20px; font-weight:600; }
   .status-active { background: var(--ok-soft); color: var(--ok); }
@@ -203,10 +227,9 @@
 </head>
 <body>
 <header>
-  <h1>🐭 Mouse Colony Manager</h1>
+  <h1>🐭 Mouse Colony Manager <span class="version-badge">v2.5</span></h1>
   <div class="toolbar">
-    <button class="primary" onclick="addCage()">＋ Cage</button>
-    <label class="filebtn">⬆ Import CSV<input type="file" accept=".csv" onchange="importCSV(this)"></label>
+    <button class="primary" onclick="addCage()">＋ Mating</button>
     <label class="filebtn">⬆ Import JSON<input type="file" accept=".json" onchange="importJSON(this)"></label>
     <button onclick="exportCSV()">⬇ Export CSV</button>
     <button onclick="exportJSON()">⬇ Export JSON</button>
@@ -216,10 +239,17 @@
 </header>
 
 <main>
+  <div class="colony-bar">
+    <div class="field" style="flex:1; min-width:240px;">
+      <label>Colony Name / Strain</label>
+      <input class="colony-name" id="colonyName" placeholder="e.g. C57BL/6J — Lab A" oninput="onColonyNameInput(this.value)">
+    </div>
+  </div>
+
   <div id="lockbar" class="lockbar"></div>
 
   <div class="searchbar" style="margin-top:14px">
-    <input type="text" id="search" placeholder="Search cage, mouse ID, sex, sample status, lineage, notes…" oninput="render()">
+    <input type="text" id="search" placeholder="Search mating, mouse ID, sex, sample status, lineage, notes…" oninput="render()">
     <div class="filters">
       <select id="fSample" onchange="render()">
         <option value="">Sample: all</option>
@@ -236,19 +266,25 @@
   <div id="content"></div>
 </main>
 
-<footer>Auto-saved to this browser. Export to JSON/CSV for a permanent backup. — Built for offline, cross-platform use.</footer>
+<footer>v2.1 — Auto-saved to this browser. Export to JSON for a complete backup (all details), or CSV for a quick-view snapshot. — Built for offline, cross-platform use.</footer>
 
 <script>
 /* ---------- Constants ---------- */
+const APP_VERSION = '2.1';
 const WEAN_AGE_DAYS = 21;
 const SEXES = ['Female','Male','Unknown'];
 const SAMPLE_STATUS = ['','Sample collected','Pending','Confirmed','Not confirmed'];
-const EVENT_TYPES = ['Paired','Plug observed','Litter born','Weaned','Male separated','Female separated','Re-paired','Disbanded','Note'];
-const STORAGE_KEY = 'mouseColony.v3';
+const EVENT_TYPES = ['Paired','Pregnant','Male separated','Female separated','Re-paired','Disbanded','Note'];
+const STORAGE_KEY = 'mouseColony.v4';
+const COLONY_NAME_KEY = 'mouseColony.colonyName';
 const LOCK_KEY = 'mouseColony.masterCode';
 
+/* Lineage modes for a parent that is NOT an existing mouse */
+const LINEAGE_MODES = ['Founder','Progeny of'];
+
 /* ---------- Data model ---------- */
-let colony = [];   // array of cages
+let colony = [];   // array of matings (cages)
+let colonyName = '';
 let filterWean = false;
 let filterActive = false;
 let editUnlocked = false;   // master lock state for the session
@@ -261,14 +297,14 @@ function blankMouse() {
            _new:true };
 }
 function blankCage() {
-  return { cage:'New_Cage',
-           femaleLineage:'', femaleDob:'',
-           maleLineage:'', maleDob:'',
+  return { cage:'New_Mating',
+           femaleId:'', femaleLineage:'', femaleDob:'', femaleLineageMode:'Founder', femaleLineageParent:'',
+           maleId:'',   maleLineage:'',   maleDob:'',   maleLineageMode:'Founder',   maleLineageParent:'',
            datePaired:'', active:true,
-           litterNote:'', events:[], mice:[blankMouse()],
+           events:[], mice:[blankMouse()],
            _new:true };
 }
-function blankEvent(){ return { type:'Litter born', date:todayISO(), detail:'', locked:false, _new:true }; }
+function blankEvent(){ return { type:'Paired', date:todayISO(), detail:'', locked:false, _new:true }; }
 
 /* ---------- Lock helpers ----------
    _new === true  → freshly added in this session, always editable.
@@ -320,12 +356,13 @@ function markAllOld(){
 /* ---------- Persistence ---------- */
 function save(){
   try{
-    // strip the volatile _new flag is NOT desirable: we keep it so session-added stays editable
     localStorage.setItem(STORAGE_KEY, JSON.stringify(colony));
+    localStorage.setItem(COLONY_NAME_KEY, colonyName);
   }catch(e){}
 }
 function load(){
   try{
+    colonyName = localStorage.getItem(COLONY_NAME_KEY) || '';
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){ const d = JSON.parse(raw); if(Array.isArray(d)){ colony = d.map(normCage); return true; } }
   }catch(e){}
@@ -334,14 +371,62 @@ function load(){
 function normCage(c){
   return {
     cage:c.cage||'',
+    femaleId:c.femaleId||'',
     femaleLineage:c.femaleLineage||'', femaleDob:c.femaleDob||'',
+    femaleLineageMode:c.femaleLineageMode||'Founder', femaleLineageParent:c.femaleLineageParent||'',
+    maleId:c.maleId||'',
     maleLineage:c.maleLineage||'', maleDob:c.maleDob||'',
+    maleLineageMode:c.maleLineageMode||'Founder', maleLineageParent:c.maleLineageParent||'',
     datePaired:c.datePaired||'',
-    active: c.active!==false, litterNote:c.litterNote||'',
+    active: c.active!==false,
     events:(c.events||[]).map(e=>({type:e.type||'Note',date:e.date||'',detail:e.detail||'',locked:!!e.locked, _new:!!e._new})),
     mice:(c.mice||[]).map(m=>({...blankMouse(),...m, alive: m.alive!==false, _new:!!m._new})),
     _new:!!c._new
   };
+}
+
+/* ---------- Known-mouse index (for auto-detect of parents) ----------
+   A parent "exists" if any mouse in the colony has a matching mouseId AND is alive.
+*/
+function findKnownMouse(id){
+  id = String(id||'').trim();
+  if(!id) return null;
+  for(const c of colony){
+    for(const m of c.mice){
+      if(String(m.mouseId).trim() === id && m.alive){
+        return { mouse:m, cage:c };
+      }
+    }
+  }
+  return null;
+}
+/* Derive a lineage label for a mouse from its birth-mating, if any. */
+function lineageOfMouse(targetMouse){
+  for(const c of colony){
+    if(c.mice.includes(targetMouse)){
+      return c.femaleLineage || c.maleLineage || '';
+    }
+  }
+  return '';
+}
+
+/* ---------- ID uniqueness ----------
+   Mouse IDs are alphanumeric and must be unique across the whole colony.
+   Ear punches are numeric-only.
+*/
+function allMouseIds(exceptMouse){
+  const set = new Set();
+  colony.forEach(c=>c.mice.forEach(m=>{
+    if(m === exceptMouse) return;
+    const id = String(m.mouseId||'').trim();
+    if(id) set.add(id.toLowerCase());
+  }));
+  return set;
+}
+function isDuplicateId(id, exceptMouse){
+  id = String(id||'').trim().toLowerCase();
+  if(!id) return false;
+  return allMouseIds(exceptMouse).has(id);
 }
 
 /* ---------- Age / weaning logic ---------- */
@@ -359,25 +444,31 @@ function ageLabel(dob){
   const w = Math.floor(days/7), d = days%7;
   return `${w}w ${d}d`;
 }
-/* Wean flag clears the moment a weaning date is filled; reappears if cleared */
 function isWeanReady(m){
   const days = ageDays(m.dob);
   return m.alive && days!==null && days>=WEAN_AGE_DAYS && !m.weaningDate;
 }
 
-/* ---------- Auto-increment ID ---------- */
+/* ---------- Auto-increment ID (never repeats) ----------
+   Finds the highest purely-numeric ID, then increments past any taken ID.
+*/
 function nextMouseId(){
   let max = 0;
   colony.forEach(c=>c.mice.forEach(m=>{
     const n = parseInt(m.mouseId,10);
-    if(!isNaN(n) && n>max) max=n;
+    if(!isNaN(n) && String(n) === String(m.mouseId).trim() && n>max) max=n;
   }));
-  return String(max+1);
+  const taken = allMouseIds(null);
+  let candidate = max + 1;
+  while(taken.has(String(candidate).toLowerCase())) candidate++;
+  return String(candidate);
 }
 
 /* ---------- Filters ---------- */
 function toggleWean(){ filterWean=!filterWean; document.getElementById('fWean').classList.toggle('active',filterWean); render(); }
 function toggleActive(){ filterActive=!filterActive; document.getElementById('fActive').classList.toggle('active',filterActive); render(); }
+
+function onColonyNameInput(v){ colonyName = v; save(); }
 
 function renderLockBar(){
   const el = document.getElementById('lockbar');
@@ -404,13 +495,16 @@ function renderLockBar(){
 function render() {
   save();
   renderLockBar();
+  const cn = document.getElementById('colonyName');
+  if(cn && cn.value !== colonyName) cn.value = colonyName;
+
   const q = document.getElementById('search').value.trim().toLowerCase();
   const sampleFilter = document.getElementById('fSample').value;
   const root = document.getElementById('content');
   root.innerHTML = '';
   updateStats();
 
-  if (!colony.length) { root.innerHTML = '<div class="empty">No cages yet. Add one, or import a CSV/JSON file.</div>'; return; }
+  if (!colony.length) { root.innerHTML = '<div class="empty">No matings yet. Add one, or import a JSON file.</div>'; return; }
 
   let anyShown = false;
 
@@ -451,35 +545,21 @@ function render() {
     head.innerHTML = `
       <input class="cage-title" value="${esc(cage.cage)}" ${cDis} onchange="upd(${ci},'cage',this.value)">
       ${dateField('Date Paired', cage.datePaired, ci,'datePaired', cDis)}
-      ${field('Litter / Weaned', cage.litterNote, ci,'litterNote', cDis)}
       <span class="pill">${aliveCount} alive / ${cage.mice.length}</span>
       <span class="status-badge ${cage.active?'status-active':'status-inactive'}">${cage.active?'Active mating':'Inactive'}</span>
       ${cardLocked?'<span class="status-badge lock-badge">🔒 locked</span>':''}
       <div class="cage-actions">
         <button class="tiny" ${cDis} onclick="toggleCageActive(${ci})">${cage.active?'Mark inactive':'Mark active'}</button>
-        <button class="tiny" ${cDis} onclick="addMouse(${ci})">＋ Mouse</button>
-        <button class="tiny danger" ${cDis} onclick="delCage(${ci})">🗑 Cage</button>
+        <button class="tiny" ${cDis} onclick="addMouse(${ci})">＋ Progeny</button>
+        <button class="tiny danger" ${cDis} onclick="delCage(${ci})">🗑 Mating</button>
       </div>`;
     card.appendChild(head);
 
-    // lineage block (separate Female / Male lineage + DOB)
+    // lineage / parent block
     const lin = document.createElement('div');
     lin.className = 'lineage-wrap';
-    lin.innerHTML = `
-      <div class="lineage female">
-        <h5>♀ Female</h5>
-        <div class="row">
-          ${field('Lineage', cage.femaleLineage, ci,'femaleLineage', cDis)}
-          ${dateField('DOB', cage.femaleDob, ci,'femaleDob', cDis)}
-        </div>
-      </div>
-      <div class="lineage male">
-        <h5>♂ Male</h5>
-        <div class="row">
-          ${field('Lineage', cage.maleLineage, ci,'maleLineage', cDis)}
-          ${dateField('DOB', cage.maleDob, ci,'maleDob', cDis)}
-        </div>
-      </div>`;
+    lin.appendChild(parentBlock('female', cage, ci, cDis));
+    lin.appendChild(parentBlock('male', cage, ci, cDis));
     card.appendChild(lin);
 
     // table
@@ -494,16 +574,14 @@ function render() {
     rowsToShow.forEach(({m,mi}) => {
       const weanReady = isWeanReady(m);
       const mDis = ro(m);
-      // Alive checkbox can only be UNCHECKED when disposition + disposition date are filled.
-      // So if mouse is currently alive and lacks disposition info, disable the checkbox.
       const canKill = m.disposition.trim() && m.dispositionDate;
       const aliveDisabled = mDis || (m.alive && !canKill);
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td class="id-col"><input value="${esc(m.mouseId)}" ${mDis} onchange="updM(${ci},${mi},'mouseId',this.value)"></td>
+        <td class="id-col"><input value="${esc(m.mouseId)}" ${mDis} placeholder="alphanumeric" onchange="updMouseId(${ci},${mi},this)"></td>
         <td><input type="date" value="${esc(m.dob)}" ${mDis} onchange="updM(${ci},${mi},'dob',this.value);render()"></td>
         <td class="age-cell ${weanReady?'wean-ready':''}">${ageLabel(m.dob)}${weanReady?'<span class="wean-tag">WEAN</span>':''}</td>
-        <td><input value="${esc(m.earPunch)}" ${mDis} onchange="updM(${ci},${mi},'earPunch',this.value)"></td>
+        <td><input value="${esc(m.earPunch)}" ${mDis} inputmode="numeric" placeholder="numeric" onchange="updEarPunch(${ci},${mi},this)"></td>
         <td><select class="sex-${esc(m.sex)}" ${mDis} onchange="updM(${ci},${mi},'sex',this.value);render()">
             ${SEXES.map(s=>`<option ${m.sex===s?'selected':''}>${s}</option>`).join('')}</select></td>
         <td><input type="date" value="${esc(m.weaningDate)}" ${mDis} onchange="updM(${ci},${mi},'weaningDate',this.value);render()"></td>
@@ -526,14 +604,14 @@ function render() {
     let evHtml = '<h4>Breeding events</h4>';
     if(!cage.events.length) evHtml += '<div class="no-events">No events logged yet.</div>';
     cage.events.forEach((ev,ei)=>{
-      const evLocked = locked(cage) || ev.locked;   // master-lock OR per-event lock
+      const evLocked = locked(cage) || ev.locked;
       const eDis = evLocked ? 'disabled' : '';
-      // The lock toggle itself stays usable unless the master lock applies.
       const lockToggleDis = locked(cage) ? 'disabled' : '';
+      const typeOpts = EVENT_TYPES.includes(ev.type) ? EVENT_TYPES : [ev.type, ...EVENT_TYPES];
       evHtml += `<div class="event-row ${ev.locked?'locked':''}">
         <button class="event-lock ${ev.locked?'on':''}" title="${ev.locked?'Unlock event (allow delete)':'Lock event (prevent delete)'}" ${lockToggleDis} onclick="toggleEventLock(${ci},${ei})">${ev.locked?'🔒':'🔓'}</button>
         <select class="e-type" ${eDis} onchange="updE(${ci},${ei},'type',this.value)">
-          ${EVENT_TYPES.map(t=>`<option ${ev.type===t?'selected':''}>${t}</option>`).join('')}
+          ${typeOpts.map(t=>`<option ${ev.type===t?'selected':''}>${esc(t)}</option>`).join('')}
         </select>
         <input class="e-date" type="date" value="${esc(ev.date)}" ${eDis} onchange="updE(${ci},${ei},'date',this.value);render()">
         <input class="e-detail" placeholder="detail (e.g. re-paired with S4)" value="${esc(ev.detail)}" ${eDis} onchange="updE(${ci},${ei},'detail',this.value)">
@@ -547,7 +625,79 @@ function render() {
     root.appendChild(card);
   });
 
-  if(!anyShown) root.innerHTML = '<div class="empty">No cages or mice match the current search/filters.</div>';
+  if(!anyShown) root.innerHTML = '<div class="empty">No matings or mice match the current search/filters.</div>';
+}
+
+/* ---------- Parent (lineage) block ---------- */
+function parentBlock(which, cage, ci, disabled){
+  const isF = which==='female';
+  const idKey   = isF ? 'femaleId'   : 'maleId';
+  const linKey  = isF ? 'femaleLineage' : 'maleLineage';
+  const dobKey  = isF ? 'femaleDob'  : 'maleDob';
+  const modeKey = isF ? 'femaleLineageMode'   : 'maleLineageMode';
+  const parKey  = isF ? 'femaleLineageParent' : 'maleLineageParent';
+
+  const idVal = cage[idKey];
+  const known = findKnownMouse(idVal);
+  const auto = !!known;
+
+  const div = document.createElement('div');
+  div.className = 'lineage '+which;
+
+  let resolveHtml = '';
+  if(idVal){
+    if(known){
+      resolveHtml = `<div class="resolve found">✓ Found live mouse — lineage &amp; DOB auto-filled.</div>`;
+    } else {
+      resolveHtml = `<div class="resolve notfound">Not found among live mice — enter lineage &amp; DOB manually.</div>`;
+    }
+  }
+
+  let lineageControls = '';
+  if(auto){
+    const linDisplay = lineageOfMouse(known.mouse) || cage[linKey] || '—';
+    lineageControls = `
+      <div class="field">
+        <label>Lineage (auto)</label>
+        <input value="${esc(linDisplay)}" disabled>
+      </div>
+      <div class="field">
+        <label>DOB (auto)</label>
+        <input type="date" value="${esc(known.mouse.dob)}" disabled>
+      </div>`;
+  } else {
+    const mode = cage[modeKey] || 'Founder';
+    const parentField = mode==='Progeny of'
+      ? `<div class="field"><label>Parent mating / line</label>
+           <input value="${esc(cage[parKey])}" ${disabled} placeholder="e.g. M12 × M13"
+             onchange="upd(${ci},'${parKey}',this.value)"></div>`
+      : '';
+    lineageControls = `
+      <div class="lineage-mode">
+        <label>Lineage type</label>
+        <select ${disabled} onchange="upd(${ci},'${modeKey}',this.value);render()">
+          ${LINEAGE_MODES.map(o=>`<option ${mode===o?'selected':''}>${o}</option>`).join('')}
+        </select>
+      </div>
+      ${parentField}
+      <div class="field"><label>Lineage / strain</label>
+        <input value="${esc(cage[linKey])}" ${disabled} placeholder="strain"
+          onchange="upd(${ci},'${linKey}',this.value)"></div>
+      <div class="field"><label>DOB</label>
+        <input type="date" value="${esc(cage[dobKey])}" ${disabled}
+          onchange="upd(${ci},'${dobKey}',this.value)"></div>`;
+  }
+
+  div.innerHTML = `
+    <h5>${isF?'♀ Female':'♂ Male'}</h5>
+    <div class="row">
+      <div class="field"><label>Mouse #</label>
+        <input value="${esc(idVal)}" ${disabled} placeholder="ID of existing mouse"
+          onchange="upd(${ci},'${idKey}',this.value);render()"></div>
+      ${lineageControls}
+    </div>
+    ${resolveHtml}`;
+  return div;
 }
 
 function field(label,val,ci,key,disabled=''){
@@ -558,10 +708,10 @@ function dateField(label,val,ci,key,disabled=''){
 }
 
 function updateStats(){
-  let cages=colony.length, mice=0, alive=0, f=0, m=0, active=0, weanReady=0, pending=0, litters=0;
+  let cages=colony.length, mice=0, alive=0, f=0, m=0, active=0, weanReady=0, pending=0, progeny=0;
   colony.forEach(c=>{
     if(c.active) active++;
-    litters += c.events.filter(e=>e.type==='Litter born').length;
+    progeny += c.mice.length;
     c.mice.forEach(x=>{
       mice++;
       if(x.alive){ alive++; x.sex==='Female'?f++:(x.sex==='Male'?m++:0); }
@@ -570,14 +720,14 @@ function updateStats(){
     });
   });
   document.getElementById('stats').innerHTML =
-    `<div class="stat"><b>${cages}</b><span>Cages</span></div>
+    `<div class="stat"><b>${cages}</b><span>Matings</span></div>
      <div class="stat clickable" onclick="setActiveFilterOn()"><b style="color:var(--ok)">${active}</b><span>Active</span></div>
      <div class="stat"><b>${alive}</b><span>Alive</span></div>
      <div class="stat"><b style="color:var(--female)">${f}</b><span>Female</span></div>
      <div class="stat"><b style="color:var(--male)">${m}</b><span>Male</span></div>
      <div class="stat clickable" onclick="setWeanFilterOn()"><b style="color:var(--warn)">${weanReady}</b><span>Wean-ready</span></div>
      <div class="stat clickable" onclick="setSampleFilterPending()"><b style="color:var(--pending)">${pending}</b><span>Pending</span></div>
-     <div class="stat"><b>${litters}</b><span>Litters</span></div>`;
+     <div class="stat"><b>${progeny}</b><span>Progeny</span></div>`;
 }
 function setWeanFilterOn(){ if(!filterWean) toggleWean(); }
 function setActiveFilterOn(){ if(!filterActive) toggleActive(); }
@@ -587,6 +737,41 @@ function setSampleFilterPending(){ document.getElementById('fSample').value='Pen
 function upd(ci,key,val){ if(locked(colony[ci]))return; colony[ci][key]=val; save(); }
 function updM(ci,mi,key,val){ if(locked(colony[ci])||locked(colony[ci].mice[mi]))return; colony[ci].mice[mi][key]=val; save(); }
 function updE(ci,ei,key,val){ const e=colony[ci].events[ei]; if(locked(colony[ci])||e.locked)return; e[key]=val; save(); }
+
+/* Mouse ID edit — alphanumeric, must be unique */
+function updMouseId(ci,mi,input){
+  const m = colony[ci].mice[mi];
+  if(locked(colony[ci])||locked(m)){ render(); return; }
+  const raw = String(input.value||'').trim();
+  // strip anything that isn't alphanumeric
+  const cleaned = raw.replace(/[^A-Za-z0-9]/g,'');
+  if(cleaned !== raw){
+    alert('Mouse ID must be alphanumeric (letters and numbers only). Invalid characters were removed.');
+  }
+  if(cleaned && isDuplicateId(cleaned, m)){
+    alert('Duplicate Mouse ID "'+cleaned+'". IDs must be unique across the colony. Reverting.');
+    input.value = m.mouseId;
+    render();
+    return;
+  }
+  m.mouseId = cleaned;
+  save();
+  render();
+}
+
+/* Ear punch edit — numeric only */
+function updEarPunch(ci,mi,input){
+  const m = colony[ci].mice[mi];
+  if(locked(colony[ci])||locked(m)){ render(); return; }
+  const raw = String(input.value||'').trim();
+  const cleaned = raw.replace(/[^0-9]/g,'');
+  if(cleaned !== raw){
+    alert('Ear Punch must be numeric (digits only). Non-numeric characters were removed.');
+  }
+  m.earPunch = cleaned;
+  input.value = cleaned;
+  save();
+}
 
 /* Alive ↔ disposition rule */
 function setAlive(ci,mi,checked){
@@ -603,18 +788,33 @@ function setAlive(ci,mi,checked){
 }
 
 function addCage(){ colony.push(blankCage()); render(); }
-function delCage(ci){ if(locked(colony[ci]))return; if(confirm('Delete cage "'+colony[ci].cage+'" and all its mice?')){ colony.splice(ci,1); render(); } }
+function delCage(ci){ if(locked(colony[ci]))return; if(confirm('Delete mating "'+colony[ci].cage+'" and all its progeny?')){ colony.splice(ci,1); render(); } }
 function toggleCageActive(ci){ if(locked(colony[ci]))return; colony[ci].active=!colony[ci].active; render(); }
-function addMouse(ci){ if(locked(colony[ci]))return; const mo=blankMouse(); mo.mouseId=nextMouseId(); mo.earPunch=mo.mouseId; colony[ci].mice.push(mo); render(); }
+
+/* Add progeny: unique auto ID, autofill DOB & weaning date from the row above */
+function addMouse(ci){
+  if(locked(colony[ci]))return;
+  const cage = colony[ci];
+  const prev = cage.mice.length ? cage.mice[cage.mice.length-1] : null;
+  const mo = blankMouse();
+  mo.mouseId = nextMouseId();
+  mo.earPunch = mo.mouseId.replace(/[^0-9]/g,'');  // numeric portion only
+  if(prev){
+    mo.dob = prev.dob || '';
+    mo.weaningDate = prev.weaningDate || '';
+  }
+  cage.mice.push(mo);
+  render();
+}
 function delMouse(ci,mi){ if(locked(colony[ci])||locked(colony[ci].mice[mi]))return; colony[ci].mice.splice(mi,1); render(); }
 function addEvent(ci){ if(locked(colony[ci]))return; colony[ci].events.push(blankEvent()); render(); }
 function delEvent(ci,ei){ const e=colony[ci].events[ei]; if(locked(colony[ci])||e.locked)return; colony[ci].events.splice(ei,1); render(); }
 function toggleEventLock(ci,ei){ if(locked(colony[ci]))return; const e=colony[ci].events[ei]; e.locked=!e.locked; render(); }
-function clearAll(){ if(confirm('Clear everything? Export first if needed.')){ colony=[]; editUnlocked=true; render(); } }
+function clearAll(){ if(confirm('Clear everything? Export first if needed.')){ colony=[]; colonyName=''; const cn=document.getElementById('colonyName'); if(cn) cn.value=''; editUnlocked=true; render(); } }
 
 /* ---------- Search matching ---------- */
 function cageMatches(c,q){
-  return [c.cage,c.femaleLineage,c.maleLineage,c.datePaired,c.litterNote].join(' ').toLowerCase().includes(q);
+  return [c.cage,c.femaleId,c.maleId,c.femaleLineage,c.maleLineage,c.femaleLineageParent,c.maleLineageParent,c.datePaired].join(' ').toLowerCase().includes(q);
 }
 function mouseHaystack(m){
   return [m.mouseId,m.earPunch,m.sex,m.sampleStatus,m.disposition,m.notes,m.dob].join(' ').toLowerCase();
@@ -623,150 +823,99 @@ function mouseHaystack(m){
 /* ---------- Helpers ---------- */
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-/* ---------- Date normalization for import ---------- */
-function toISO(s){
-  if(!s) return '';
-  s = String(s).trim();
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if(m) return s;
-  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-  if(m){
-    let [_,d,mo,y]=m;
-    if(y.length===2) y='20'+y;
-    return `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
-  }
-  return '';
+/* ---------- JSON (full-fidelity store) ---------- */
+function exportJSON(){
+  download('mouse_colony.json', JSON.stringify({version:APP_VERSION, colonyName, matings:colony},null,2), 'application/json');
 }
-
-/* ---------- JSON ---------- */
-function exportJSON(){ download('mouse_colony.json', JSON.stringify(colony,null,2), 'application/json'); }
 function importJSON(input){
   const file=input.files[0]; if(!file) return;
   const r=new FileReader();
-  r.onload=e=>{ try{ const d=JSON.parse(e.target.result);
-      if(!Array.isArray(d)) throw 0;
+  r.onload=e=>{ try{ const parsed=JSON.parse(e.target.result);
+      let d;
+      if(Array.isArray(parsed)){ d=parsed; }                 // legacy format
+      else if(parsed && Array.isArray(parsed.matings)){ d=parsed.matings; colonyName=parsed.colonyName||colonyName; }
+      else throw 0;
       colony=d.map(normCage);
-      markAllOld();              // imported data = old → locked if a master code exists
+      markAllOld();
       editUnlocked=false;
       render();
     }catch{ alert('Invalid JSON file.'); } };
   r.readAsText(file); input.value='';
 }
 
-/* ---------- CSV ---------- */
-const CSV_HEADERS = ['CAGE','Female Lineage','Female DOB','Male Lineage','Male DOB','Date Paired','Active','Litter/Weaned',
-  'DOB','Mouse ID','Ear Punch','Sex','Weaning Date','Sample Status','Disposition','Disposition Date','Alive','Notes'];
+/* ---------- CSV (export only — quick-view snapshot) ----------
+   Column layout matches the visualization sheet:
+   Colony/Strain, MATING, Female Parent ID, Female Parent Dob,
+   Male Parent ID, Male Parent DOB, Mouse ID, Ear Punch, Sex, DOB,
+   Weaning Date, Disposition, Disposition Date, Notes
+*/
+const CSV_HEADERS = ['Colony/Strain','MATING','Female Parent ID','Female Parent Dob',
+  'Male Parent ID','Male Parent DOB','Mouse ID','Ear Punch','Sex','DOB',
+  'Weaning Date','Genotyping Status','Disposition','Disposition Date','Notes'];
+
+
+
+/* Build "Lineage LineageMode ParentID" for a parent.
+   - If the parent ID matches a live mouse, use that mouse's derived
+     lineage and its ID (mode is implicitly "existing").
+   - Otherwise use the manually entered lineage, mode, and either the
+     entered Mouse # or the "Progeny of" parent reference. */
+function parentLabel(which, c){
+  const isF = which === 'female';
+  const id     = (isF ? c.femaleId     : c.maleId)     || '';
+  const known  = findKnownMouse(id);
+
+  if(known){
+    const lineage = lineageOfMouse(known.mouse) || (isF ? c.femaleLineage : c.maleLineage) || '';
+    return [lineage, 'Existing', id].filter(Boolean).join(' ').trim();
+  }
+
+  const lineage = (isF ? c.femaleLineage     : c.maleLineage)     || '';
+  const mode    = (isF ? c.femaleLineageMode : c.maleLineageMode) || '';
+  // For "Progeny of" the meaningful reference is the parent mating/line;
+  // otherwise fall back to the entered Mouse # (founder line).
+  const ref = mode === 'Progeny of'
+    ? ((isF ? c.femaleLineageParent : c.maleLineageParent) || '')
+    : id;
+
+  return [lineage, mode, ref].filter(Boolean).join(' ').trim();
+}
+
+
 
 function exportCSV(){
-  const rows=[CSV_HEADERS];
+  const rows = [CSV_HEADERS];
+
   colony.forEach(c=>{
-    const meta=[c.cage,c.femaleLineage,c.femaleDob,c.maleLineage,c.maleDob,c.datePaired,c.active?'Active':'Inactive',c.litterNote];
+    const meta = [
+      colonyName,
+      c.cage,
+      parentLabel('female', c), c.femaleDob,
+      parentLabel('male',   c), c.maleDob
+    ];
+
     if(!c.mice.length){
-      rows.push([...meta,'','','','','','','','','','']);
+      // Fill the remaining 9 mouse columns with blanks.
+      rows.push([...meta, '', '', '', '', '', '', '', '', '']);
+      return;
     }
+
     c.mice.forEach(m=>{
-      rows.push([...meta, m.dob,m.mouseId,m.earPunch,m.sex,m.weaningDate,
-        m.sampleStatus,m.disposition,m.dispositionDate, m.alive?'Yes':'No', m.notes]);
+      rows.push([...meta,
+        m.mouseId, m.earPunch, m.sex, m.dob,
+        m.weaningDate, m.sampleStatus, m.disposition, m.dispositionDate, m.notes
+      ]);
     });
   });
-  const csv=rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
+
+  const csv = rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
   download('mouse_colony.csv', csv, 'text/csv');
 }
+
+
+
+
 function csvCell(v){ v=String(v==null?'':v); return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
-
-function importCSV(input){
-  const file=input.files[0]; if(!file) return;
-  const r=new FileReader();
-  r.onload=e=>{ try{ parseCSVtoColony(e.target.result);
-      markAllOld(); editUnlocked=false; render(); }
-    catch(err){ alert('Could not parse CSV: '+err); } };
-  r.readAsText(file); input.value='';
-}
-function parseCSVtoColony(text){
-  const rows=parseCSV(text);
-  if(rows.length<2){ alert('CSV looks empty.'); return; }
-  const head=rows[0].map(h=>h.trim().toLowerCase());
-  function find(opts){ for(const o of opts){ const i=head.findIndex(h=>h.startsWith(o)); if(i>=0)return i;} return -1; }
-  const idx={
-    cage:find(['cage']),
-    femaleLineage:find(['female lineage','female line']),
-    femaleDob:find(['female dob']),
-    maleLineage:find(['male lineage','male line']),
-    maleDob:find(['male dob']),
-    datePaired:find(['date paired']), active:find(['active']),
-    litter:find(['litter/weaned','no. of litter','litter','weaned']),
-    dob:find(['dob']), mouseId:find(['mouse id']), earPunch:find(['ear punch']),
-    sex:find(['sex']), weaning:find(['weaning date']),
-    sampleStatus:find(['sample status','sample']),
-    disposition:find(['disposition date']>=0?['disposition']:['disposition']),
-    dispositionDate:find(['disposition date']),
-    alive:find(['alive']), notes:find(['notes'])
-  };
-  // disambiguate disposition vs disposition date (both start with "disposition")
-  idx.disposition = (function(){
-    const i = head.findIndex(h=>h.startsWith('disposition') && !h.startsWith('disposition date'));
-    return i>=0 ? i : find(['disposition']);
-  })();
-
-  const get=(row,i)=> i>=0&&i<row.length? row[i].trim():'';
-
-  const map={}; const order=[];
-  for(let r=1;r<rows.length;r++){
-    const row=rows[r];
-    if(row.every(c=>!c.trim())) continue;
-    const cageName=get(row,idx.cage);
-    let key = cageName || (order.length?order[order.length-1]:'');
-    if(cageName && !map[cageName]){
-      map[cageName]={cage:cageName,
-        femaleLineage:get(row,idx.femaleLineage), femaleDob:toISO(get(row,idx.femaleDob)),
-        maleLineage:get(row,idx.maleLineage), maleDob:toISO(get(row,idx.maleDob)),
-        datePaired:toISO(get(row,idx.datePaired)),
-        active: /inactive|no|false/i.test(get(row,idx.active))?false:true,
-        litterNote:get(row,idx.litter),events:[],mice:[]};
-      order.push(cageName); key=cageName;
-    }
-    if(!key){
-      key='Unassigned'; if(!map[key]){map[key]={cage:key,femaleLineage:'',femaleDob:'',maleLineage:'',maleDob:'',datePaired:'',active:true,litterNote:'',events:[],mice:[]};order.push(key);}
-    }
-    if(cageName && map[cageName] && get(row,idx.litter)){
-      map[cageName].litterNote=map[cageName].litterNote||get(row,idx.litter);
-    }
-    const sexRaw=get(row,idx.sex);
-    const sex = /^m/i.test(sexRaw)?'Male' : /^f/i.test(sexRaw)?'Female' : (sexRaw?'Unknown':'Female');
-    const aliveRaw=get(row,idx.alive);
-    const hasMouse = get(row,idx.mouseId)||get(row,idx.dob)||sexRaw;
-    if(hasMouse){
-      map[key].mice.push({
-        dob:toISO(get(row,idx.dob)), mouseId:get(row,idx.mouseId), earPunch:get(row,idx.earPunch),
-        sex, weaningDate:toISO(get(row,idx.weaning)),
-        sampleStatus:get(row,idx.sampleStatus),
-        disposition:get(row,idx.disposition),
-        dispositionDate:toISO(get(row,idx.dispositionDate)),
-        alive: aliveRaw? /yes|true|alive|1/i.test(aliveRaw):true,
-        notes:get(row,idx.notes)
-      });
-    }
-  }
-  colony=order.map(k=>map[k]).map(normCage);
-}
-function parseCSV(text){
-  const rows=[]; let row=[],cell='',q=false;
-  text=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-  for(let i=0;i<text.length;i++){
-    const c=text[i];
-    if(q){
-      if(c==='"'){ if(text[i+1]==='"'){cell+='"';i++;} else q=false; }
-      else cell+=c;
-    } else {
-      if(c==='"') q=true;
-      else if(c===','){ row.push(cell); cell=''; }
-      else if(c==='\n'){ row.push(cell); rows.push(row); row=[]; cell=''; }
-      else cell+=c;
-    }
-  }
-  if(cell!==''||row.length){ row.push(cell); rows.push(row); }
-  return rows;
-}
 
 function download(name, content, type){
   const blob=new Blob([content],{type}); const url=URL.createObjectURL(blob);
@@ -775,10 +924,12 @@ function download(name, content, type){
 }
 
 /* ---------- init ---------- */
-if(!load()){ colony=[]; editUnlocked=true; }
+if(!load()){ colony=[]; colonyName=''; editUnlocked=true; }
 else {
-  // data restored from storage. If a master code exists, treat restored data as locked.
   if(hasMasterCode()) editUnlocked=false; else editUnlocked=true;
+}
+{
+  const cn=document.getElementById('colonyName'); if(cn) cn.value=colonyName;
 }
 render();
 </script>
